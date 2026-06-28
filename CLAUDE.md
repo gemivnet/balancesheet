@@ -34,11 +34,14 @@ src/
     state.ts        initial state + SAVE_VERSION
     engine.ts       the simulation: tick(), click(), buyUnit(), hireManager(), buyRental(), buyUpgrade()
     city.ts         city layout (spiral) + real-estate config & tiers
+    resources.ts    material definitions (wood, ore, planks, metal, goods)
+    facilities.ts   << add a factory/extractor here (data only)
+    contracts.ts    contract generation + resource values
     save.ts         serialize/deserialize + localStorage wrappers
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
   store/game.svelte.ts   tick loop + the reactive `view` snapshot + all actions
-  ui/             one Svelte component per piece of the screen
+  ui/             Svelte components, organised into Work / City / Industry tabs
   render/         renderer seam for the future isometric city
   theme/          UI theme tiers
 ```
@@ -57,6 +60,10 @@ upgrades is auto-generated for it in `upgrades.ts`. Use a stable, unique `id`
 **A new UI upgrade / theme tier:** add a `ThemeId` in `types.ts`, a `.theme-<id>`
 block in `app.css`, an entry in `theme/themes.ts`, and a `kind: 'ui'` upgrade with
 `ui: { type: 'theme', theme: '<id>' }`. The App applies `theme-<id>` to the root.
+
+**A new facility:** add to `FACILITY_DEFS` in `facilities.ts` (inputs/outputs are per
+owned unit, per second). Machine upgrades generate automatically. Keep producers
+listed before the factories that consume them so a chain flows within one tick.
 
 ## Saves — don't break them
 
@@ -81,8 +88,9 @@ block in `app.css`, an entry in `theme/themes.ts`, and a `kind: 'ui'` upgrade wi
 Costs and rates live entirely in `businesses.ts` / `upgrades.ts`. The cost curve is
 `baseCost × costGrowth^owned`; passive income is `revenue ÷ cycleTime`; offline is
 capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Real-estate prices, rent, and the
-city tiers live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`). Tune there — no engine
-changes.
+city tiers live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`); factory recipes/costs in
+`facilities.ts`; contract sizing in `contracts.ts` (`RESOURCE_VALUE`). Tune there —
+no engine changes.
 
 ## Working on it
 
@@ -96,7 +104,8 @@ changes.
 
 1. ✅ **City & real-estate** — `engine/city.ts` (spiral layout + tiers) and
    `ui/CityMap.svelte`; buy property for rent, Hamlet → Metropolis.
-2. **Production** — resources, factories, machines, and contracts/jobs you choose.
+2. ✅ **Production** — `facilities.ts` + `contracts.ts`; raw materials → factories →
+   goods → contracts you choose, in the Industry tab.
 3. **Finance** — `engine/economy/`: checking/savings, bonds, a simulated stock
    market, FX, and loans/leverage; charts in the UI.
 4. **Isometric UI** — a canvas `Renderer` in `render/iso/` sold to the player as

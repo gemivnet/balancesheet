@@ -5,7 +5,8 @@
 
 import { D } from './num'
 import { BUSINESS_DEFS } from './businesses'
-import type { BusinessDef, UpgradeDef } from './types'
+import { FACILITY_DEFS } from './facilities'
+import type { BusinessDef, FacilityDef, UpgradeDef } from './types'
 
 function revenueUpgrades(b: BusinessDef): UpgradeDef[] {
   const thresholds = [10, 25, 50, 100, 200]
@@ -35,6 +36,20 @@ function speedUpgrades(b: BusinessDef): UpgradeDef[] {
   }))
 }
 
+function machineUpgrades(f: FacilityDef): UpgradeDef[] {
+  const thresholds = [5, 20]
+  return thresholds.map((t, i) => ({
+    id: `${f.id}_mach_${t}`,
+    name: `${f.name} · machines ${i + 1}`,
+    desc: `Double ${f.name} output`,
+    cost: f.baseCost.mul(Math.pow(f.costGrowth, t)).mul(t * 3),
+    kind: 'facilityOutput',
+    factor: 2,
+    target: f.id,
+    requiresFacility: { facility: f.id, owned: t },
+  }))
+}
+
 const CLICK_UPGRADES: UpgradeDef[] = [
   { id: 'click_2', name: 'Roll Up Sleeves', desc: 'Double manual work output', cost: D(150), kind: 'clickPower', factor: 2 },
   { id: 'click_3', name: 'Hustle Mindset', desc: 'Triple manual work output', cost: D(5000), kind: 'clickPower', factor: 3 },
@@ -54,6 +69,7 @@ export const UI_UPGRADES: UpgradeDef[] = [
 
 export const UPGRADE_DEFS: UpgradeDef[] = [
   ...BUSINESS_DEFS.flatMap((b) => [...revenueUpgrades(b), ...speedUpgrades(b)]),
+  ...FACILITY_DEFS.flatMap(machineUpgrades),
   ...CLICK_UPGRADES,
   ...GLOBAL_UPGRADES,
   ...UI_UPGRADES,

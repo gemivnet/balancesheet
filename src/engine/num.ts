@@ -55,3 +55,24 @@ function toSci(d: Decimal, exp: number): string {
 export function formatInt(n: number): string {
   return Math.floor(n).toLocaleString('en-US')
 }
+
+/** Format a resource quantity (no `$`); whole numbers stay clean, big piles abbreviate. */
+export function formatQty(value: Decimal, abbreviate: boolean): string {
+  const negative = value.lt(0)
+  const d = negative ? value.abs() : value
+  const sign = negative ? '-' : ''
+  if (d.lt(1000)) {
+    const n = d.toNumber()
+    return sign + (Number.isInteger(n) ? String(n) : n.toFixed(1))
+  }
+  const exp = Math.floor(d.log10())
+  if (!abbreviate) {
+    if (exp < 15) return sign + Math.floor(d.toNumber()).toLocaleString('en-US')
+    return sign + toSci(d, exp)
+  }
+  const tier = Math.floor(exp / 3)
+  if (tier > 0 && tier < SUFFIXES.length) {
+    return sign + d.div(new Decimal(10).pow(tier * 3)).toNumber().toFixed(2) + SUFFIXES[tier]
+  }
+  return sign + toSci(d, exp)
+}

@@ -473,3 +473,164 @@ button.tile.forSale {
   width: 100%;
   padding: 8px;
 }
+
+/* sticky header — HUD + tabs stay put while scrolling */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--bg);
+  padding-top: 6px;
+  margin-bottom: 14px;
+}
+.sticky-top .hud {
+  margin-bottom: 8px;
+}
+
+/* tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.tabs button {
+  border: 1px solid var(--line);
+  border-bottom: none;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 6px 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  position: relative;
+  top: 1px;
+}
+.tabs button.active,
+.tabs button:hover {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* resources */
+.resource-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.resource {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+}
+.resource .r-glyph {
+  font-weight: 700;
+}
+.resource .r-name {
+  font-size: 11px;
+  color: var(--muted);
+}
+.resource .r-amt {
+  font-weight: 700;
+}
+.resource .r-rate {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* facilities */
+.facilities {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.facility {
+  border: 1px solid var(--line);
+  padding: 8px;
+}
+.facility.locked {
+  opacity: 0.55;
+}
+.fac-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.fac-head .glyph {
+  font-weight: 700;
+}
+.fac-head .name {
+  flex: 1;
+}
+.fac-head .owned {
+  color: var(--muted);
+}
+.fac-recipe {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0;
+}
+.fac-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fac-actions button {
+  font-size: 12px;
+}
+.fac-locked {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* contracts */
+.contracts-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .contracts-cols {
+    grid-template-columns: 1fr;
+  }
+}
+.contracts-col h3 {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+.contract {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+.contract.ready {
+  outline: 2px solid var(--line);
+}
+.c-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+}
+.c-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.c-btns {
+  display: flex;
+  gap: 4px;
+}
+.c-sub button {
+  font-size: 11px;
+}

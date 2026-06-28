@@ -11,8 +11,11 @@ import { load, save, hasSave, clearSave, serialize, deserialize } from '../engin
 import { applyOffline, MAX_OFFLINE_SECONDS } from '../engine/offline'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from '../engine/businesses'
 import { UPGRADE_DEFS } from '../engine/upgrades'
-import { formatMoney, formatRate, formatInt } from '../engine/num'
+import { D, formatMoney, formatRate, formatInt, formatQty } from '../engine/num'
 import { layoutCity, cityTier } from '../engine/city'
+import { FACILITY_DEFS } from '../engine/facilities'
+import { RESOURCE_DEFS, RESOURCE_BY_ID } from '../engine/resources'
+import { MAX_ACTIVE } from '../engine/contracts'
 import type { CellKind, PlacedCell } from '../engine/city'
 import type { ThemeId } from '../engine/types'
 
@@ -59,6 +62,49 @@ export interface CityCell {
   businessId?: string
 }
 
+export interface ResourceRow {
+  id: string
+  name: string
+  glyph: string
+  amountText: string
+  rateText: string
+}
+
+export interface FacilityRow {
+  id: string
+  name: string
+  glyph: string
+  blurb: string
+  owned: number
+  ownedText: string
+  unlocked: boolean
+  unlockText: string
+  recipe: string
+  costText: string
+  canBuy: boolean
+  maxCount: number
+  costMaxText: string
+  canBuyMax: boolean
+}
+
+export interface OfferRow {
+  id: number
+  glyph: string
+  demandText: string
+  rewardText: string
+  timeText: string
+  canAccept: boolean
+}
+
+export interface ActiveRow {
+  id: number
+  glyph: string
+  demandText: string
+  rewardText: string
+  remainingText: string
+  canDeliver: boolean
+}
+
 export const view = $state({
   cashText: '$0.00',
   incomeText: '$0.00/s',
@@ -79,6 +125,13 @@ export const view = $state({
     canBuyRental: false,
     cols: 1,
     cells: [] as CityCell[],
+  },
+  industry: {
+    resources: [] as ResourceRow[],
+    facilities: [] as FacilityRow[],
+    machines: [] as UpgradeRow[],
+    offers: [] as OfferRow[],
+    active: [] as ActiveRow[],
   },
 })
 
@@ -123,7 +176,9 @@ function snapshot(): void {
     }
   })
 
-  view.upgrades = UPGRADE_DEFS.filter((u) => engine.upgradeVisible(u.id) && !s.upgrades[u.id]).map(
+  view.upgrades = UPGRADE_DEFS.filter(
+    (u) => u.kind !== 'facilityOutput' && engine.upgradeVisible(u.id) && !s.upgrades[u.id],
+  ).map(
     (u): UpgradeRow => ({
       id: u.id,
       name: u.name,
@@ -172,6 +227,73 @@ function snapshot(): void {
     view.city.cols = layout.maxX - layout.minX + 1
     view.city.cells = cells
   }
+
+  // --- industry (resources, facilities, machines, contracts) ---
+  view.industry.resources = RESOURCE_DEFS.map((r): ResourceRow => {
+    const rate = engine.resourceNetRate(r.id)
+    return {
+      id: r.id,
+      name: r.name,
+      glyph: r.glyph,
+      amountText: formatQty(s.resources[r.id], ab),
+      rateText: (rate.gt(0) ? '+' : '') + formatQty(rate, ab) + '/s',
+    }
+  })
+
+  view.industry.facilities = FACILITY_DEFS.map((def): FacilityRow => {
+    const owned = s.facilities[def.id].owned
+    const unlocked = engine.facilityUnlocked(def.id) || owned > 0
+    const cost1 = engine.facilityCost(def.id, 1)
+    const maxCount = engine.maxAffordableFacility(def.id)
+    const costMax = engine.facilityCost(def.id, Math.max(1, maxCount))
+    const ins = def.inputs.map((i) => `${i.amount} ${RESOURCE_BY_ID[i.resource].name}`).join(' + ')
+    const outs = def.outputs.map((o) => `${o.amount} ${RESOURCE_BY_ID[o.resource].name}`).join(' + ')
+    return {
+      id: def.id,
+      name: def.name,
+      glyph: def.glyph,
+      blurb: def.blurb,
+      owned,
+      ownedText: formatInt(owned),
+      unlocked,
+      unlockText: `unlocks at ${formatMoney(def.unlockLifetime, ab)} earned`,
+      recipe: (ins ? `${ins} → ` : '→ ') + outs + ' /s',
+      costText: formatMoney(cost1, ab),
+      canBuy: unlocked && s.cash.gte(cost1),
+      maxCount,
+      costMaxText: formatMoney(costMax, ab),
+      canBuyMax: unlocked && maxCount > 0,
+    }
+  })
+
+  view.industry.machines = UPGRADE_DEFS.filter(
+    (u) => u.kind === 'facilityOutput' && engine.upgradeVisible(u.id) && !s.upgrades[u.id],
+  ).map((u): UpgradeRow => ({
+    id: u.id,
+    name: u.name,
+    desc: u.desc,
+    cost: formatMoney(u.cost, ab),
+    canBuy: s.cash.gte(u.cost),
+    kind: u.kind,
+  }))
+
+  const board = s.contracts
+  view.industry.offers = board.available.map((c): OfferRow => ({
+    id: c.id,
+    glyph: RESOURCE_BY_ID[c.resource].glyph,
+    demandText: `${c.amount} ${RESOURCE_BY_ID[c.resource].name}`,
+    rewardText: formatMoney(D(c.reward), ab),
+    timeText: `${c.timeLimit}s limit`,
+    canAccept: board.active.length < MAX_ACTIVE,
+  }))
+  view.industry.active = board.active.map((c): ActiveRow => ({
+    id: c.id,
+    glyph: RESOURCE_BY_ID[c.resource].glyph,
+    demandText: `${c.amount} ${RESOURCE_BY_ID[c.resource].name}`,
+    rewardText: formatMoney(D(c.reward), ab),
+    remainingText: `${Math.max(0, Math.ceil(c.remaining))}s`,
+    canDeliver: engine.canDeliver(c),
+  }))
 }
 
 // ---- actions -------------------------------------------------------------
@@ -218,6 +340,32 @@ export function setActive(id: string): void {
 
 export function buyRental(): void {
   engine.buyRental()
+  snapshot()
+}
+
+export function buildFacility(id: string): void {
+  engine.buyFacility(id, 1)
+  snapshot()
+}
+
+export function buildFacilityMax(id: string): void {
+  const n = engine.maxAffordableFacility(id)
+  if (n > 0) engine.buyFacility(id, n)
+  snapshot()
+}
+
+export function acceptContract(id: number): void {
+  engine.acceptContract(id)
+  snapshot()
+}
+
+export function deliverContract(id: number): void {
+  engine.deliverContract(id)
+  snapshot()
+}
+
+export function declineContract(id: number): void {
+  engine.declineContract(id)
   snapshot()
 }
 
@@ -279,6 +427,7 @@ function frame(now: number): void {
   const dt = Math.min((now - last) / 1000, MAX_DT)
   last = now
   engine.tick(dt)
+  engine.tickContracts(dt)
   if (now - lastSnap >= SNAP_MS) {
     snapshot()
     lastSnap = now

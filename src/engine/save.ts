@@ -6,7 +6,10 @@
 import { D } from './num'
 import { initialState, SAVE_VERSION } from './state'
 import { BUSINESS_DEFS } from './businesses'
-import type { GameState, ThemeId } from './types'
+import { RESOURCE_DEFS } from './resources'
+import { FACILITY_DEFS } from './facilities'
+import { FIRST_OFFER_DELAY } from './contracts'
+import type { ContractBoard, GameState, ThemeId } from './types'
 
 const SAVE_KEY = 'ascii-tycoon-save'
 
@@ -20,6 +23,9 @@ interface SavedShape {
   ui: { abbreviate: boolean; theme: string }
   stats: { totalClicks: number }
   rentals: number
+  resources: Record<string, string>
+  facilities: Record<string, number>
+  contracts: ContractBoard
   lastSaved: number
 }
 
@@ -39,6 +45,9 @@ export function serialize(state: GameState): string {
     ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme },
     stats: { totalClicks: state.stats.totalClicks },
     rentals: state.rentals,
+    resources: Object.fromEntries(Object.entries(state.resources).map(([k, v]) => [k, v.toString()])),
+    facilities: Object.fromEntries(Object.entries(state.facilities).map(([k, v]) => [k, v.owned])),
+    contracts: state.contracts,
     lastSaved: state.lastSaved,
   }
   return JSON.stringify(shape)
@@ -59,6 +68,30 @@ export function deserialize(raw: string): GameState {
   }
   if (data.stats) state.stats.totalClicks = data.stats.totalClicks ?? 0
   if (typeof data.rentals === 'number') state.rentals = data.rentals
+  if (data.resources) {
+    for (const r of RESOURCE_DEFS) {
+      const v = data.resources[r.id]
+      if (v != null) state.resources[r.id] = D(v)
+    }
+  }
+  if (data.facilities) {
+    for (const f of FACILITY_DEFS) {
+      const owned = data.facilities[f.id]
+      if (typeof owned === 'number') state.facilities[f.id].owned = owned
+    }
+  }
+  if (
+    data.contracts &&
+    Array.isArray(data.contracts.available) &&
+    Array.isArray(data.contracts.active)
+  ) {
+    state.contracts = {
+      available: data.contracts.available,
+      active: data.contracts.active,
+      nextId: data.contracts.nextId ?? 1,
+      refreshTimer: data.contracts.refreshTimer ?? FIRST_OFFER_DELAY,
+    }
+  }
   if (data.lastSaved != null) state.lastSaved = data.lastSaved
 
   // Merge saved business state onto defaults so newly-added businesses default in.

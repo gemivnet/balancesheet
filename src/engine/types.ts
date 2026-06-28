@@ -26,6 +26,7 @@ export type UpgradeKind =
   | 'businessSpeed' // multiply one business's cycle speed
   | 'clickPower' // multiply manual click yield (global)
   | 'globalRevenue' // multiply all revenue
+  | 'facilityOutput' // multiply one facility's output (machines)
   | 'ui' // unlock a UI / quality-of-life tier (no economic effect)
 
 export type ThemeId = 'mono' | 'gray' // future tiers: 'color', 'iso'
@@ -43,6 +44,7 @@ export interface UpgradeDef {
   target?: BusinessId // for businessRevenue / businessSpeed
   ui?: UiEffect // for kind 'ui'
   requires?: { business: BusinessId; owned: number } // visibility gate
+  requiresFacility?: { facility: string; owned: number }
 }
 
 /** Mutable, saved per-business state. */
@@ -50,6 +52,44 @@ export interface BusinessState {
   owned: number
   managed: boolean
   progress: number // 0..1 within the current work-cycle
+}
+
+// --- production layer ---
+
+export type ResourceId = 'wood' | 'ore' | 'planks' | 'metal' | 'goods'
+
+/** A facility consumes inputs and produces outputs, per owned unit, per second. */
+export interface FacilityDef {
+  id: string
+  name: string
+  glyph: string
+  blurb: string
+  baseCost: Decimal
+  costGrowth: number
+  inputs: { resource: ResourceId; amount: number }[]
+  outputs: { resource: ResourceId; amount: number }[]
+  unlockLifetime: Decimal // revealed once lifetime earnings reach this
+}
+
+export interface FacilityState {
+  owned: number
+}
+
+/** A job: deliver `amount` of `resource` before the timer for a cash `reward`. */
+export interface Contract {
+  id: number
+  resource: ResourceId
+  amount: number
+  reward: number
+  timeLimit: number
+  remaining: number // seconds left once accepted
+}
+
+export interface ContractBoard {
+  available: Contract[]
+  active: Contract[]
+  nextId: number
+  refreshTimer: number
 }
 
 /** The full mutable game state. This is what gets saved/loaded. */
@@ -63,6 +103,9 @@ export interface GameState {
   ui: { abbreviate: boolean; theme: ThemeId }
   stats: { totalClicks: number }
   rentals: number // rental properties owned (real estate)
+  resources: Record<ResourceId, Decimal>
+  facilities: Record<string, FacilityState>
+  contracts: ContractBoard
   lastSaved: number // epoch ms — used to compute offline progress
 }
 
@@ -71,4 +114,5 @@ export interface Mults {
   global: Decimal
   click: Decimal
   byBusiness: Record<BusinessId, { revenue: Decimal; speed: number }>
+  byFacility: Record<string, { output: Decimal }>
 }

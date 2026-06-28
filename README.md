@@ -9,9 +9,9 @@ automate them, then watch the money pile up while you're away. Grounded economic
 now; a scrollable city map, factories, and a finance market (stocks, bonds, FX,
 loans) are on the roadmap.
 
-> **Status: playable** — clicking → idle income, three starter businesses, a deep
-> upgrade list, a scrollable city you build up through real estate, save + offline
-> earnings, and the first UI-upgrade tier.
+> **Status: playable** — clicking → idle income, businesses & a deep upgrade list, a
+> scrollable city you build up through real estate, a production chain (factories,
+> machines, contracts), plus save + offline earnings and the first UI-upgrade tier.
 
 ## Run it
 
@@ -43,7 +43,10 @@ or move it between machines.
 5. Build your **city**: your shops anchor the centre — buy **property** (the Real
    Estate panel, or click a pulsing `$` lot on the map) to collect rent and grow
    from a Hamlet into a Metropolis.
-6. Close the tab and come back later for **offline earnings**.
+6. Open the **Industry** tab: build **factories** to turn raw materials into goods,
+   add **machines** to boost output, and accept **contracts** to deliver goods for
+   cash before the deadline.
+7. Close the tab and come back later for **offline earnings**.
 
 Clicking is always useful — it instantly completes a work-cycle on top of any
 idle income, so there's never any downtime.
@@ -58,20 +61,20 @@ rewrite. See [CLAUDE.md](./CLAUDE.md) for the full map and how to add content.
 
 ```
 src/
-  engine/   pure simulation: state, tick, businesses, upgrades, city/real-estate, save, offline
+  engine/   pure sim: businesses, city/real-estate, production (factories/contracts), save, offline
   store/    Svelte bridge: tick loop + reactive view snapshot
-  ui/       ASCII components: HUD, WORK button, business list, shop, city map, modals
+  ui/       ASCII components, organised into Work / City / Industry tabs (sticky HUD)
   render/   renderer seam (the isometric city lands here later)
   theme/    UI theme tiers unlocked as upgrades
 ```
 
 ## Roadmap
 
-- **Done** — clicker → idle, 3 businesses, upgrades, save/offline, UI tiers, and a
-  scrollable ASCII city with a real-estate agency (Hamlet → Metropolis).
-- **Next** — production chains (factories, machines, and contracts you choose).
-- **Then** — a finance market (savings, bonds, stocks, FX, loans) and the
-  isometric "Habbo" UI as the ultimate UI upgrade.
+- **Done** — clicker → idle, businesses & upgrades, a scrollable ASCII city with a
+  real-estate agency (Hamlet → Metropolis), and a production chain: factories,
+  machines, and contracts you choose.
+- **Next** — a finance market (savings, bonds, stocks, FX, loans).
+- **Then** — the isometric "Habbo" UI as the ultimate UI upgrade.
 
 ## License
 
