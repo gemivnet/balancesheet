@@ -12,6 +12,7 @@ describe('save round-trip', () => {
     e.state.businesses.lemonade.owned = 7
     e.state.businesses.lemonade.managed = true
     e.state.businesses.coffee.owned = 3
+    e.state.rentals = 4
     e.state.upgrades['click_2'] = true
     e.state.ui.abbreviate = true
     e.state.ui.theme = 'gray'
@@ -25,6 +26,7 @@ describe('save round-trip', () => {
     expect(restored.businesses.lemonade.owned).toBe(7)
     expect(restored.businesses.lemonade.managed).toBe(true)
     expect(restored.businesses.coffee.owned).toBe(3)
+    expect(restored.rentals).toBe(4)
     expect(restored.upgrades['click_2']).toBe(true)
     expect(restored.ui.abbreviate).toBe(true)
     expect(restored.ui.theme).toBe('gray')

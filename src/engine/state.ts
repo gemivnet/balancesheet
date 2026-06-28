@@ -16,6 +16,7 @@ export function initialState(): GameState {
     upgrades: {},
     ui: { abbreviate: false, theme: 'mono' },
     stats: { totalClicks: 0 },
+    rentals: 0,
     lastSaved: Date.now(),
   }
 }

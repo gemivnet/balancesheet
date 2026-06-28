@@ -2,9 +2,11 @@
   import { onMount } from 'svelte'
   import { view, startGame, stopGame } from './store/game.svelte'
   import Hud from './ui/Hud.svelte'
+  import CityMap from './ui/CityMap.svelte'
   import ClickButton from './ui/ClickButton.svelte'
   import BusinessList from './ui/BusinessList.svelte'
   import Shop from './ui/Shop.svelte'
+  import RealEstate from './ui/RealEstate.svelte'
   import OfflineModal from './ui/OfflineModal.svelte'
   import SaveBar from './ui/SaveBar.svelte'
 
@@ -26,6 +28,8 @@
 
   <Hud />
 
+  <CityMap />
+
   <main class="columns">
     <section class="col">
       <ClickButton />
@@ -33,6 +37,7 @@
     </section>
     <section class="col">
       <Shop />
+      <RealEstate />
     </section>
   </main>
 

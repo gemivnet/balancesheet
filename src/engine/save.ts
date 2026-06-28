@@ -19,6 +19,7 @@ interface SavedShape {
   upgrades: Record<string, true>
   ui: { abbreviate: boolean; theme: string }
   stats: { totalClicks: number }
+  rentals: number
   lastSaved: number
 }
 
@@ -37,6 +38,7 @@ export function serialize(state: GameState): string {
     upgrades: { ...state.upgrades },
     ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme },
     stats: { totalClicks: state.stats.totalClicks },
+    rentals: state.rentals,
     lastSaved: state.lastSaved,
   }
   return JSON.stringify(shape)
@@ -56,6 +58,7 @@ export function deserialize(raw: string): GameState {
     }
   }
   if (data.stats) state.stats.totalClicks = data.stats.totalClicks ?? 0
+  if (typeof data.rentals === 'number') state.rentals = data.rentals
   if (data.lastSaved != null) state.lastSaved = data.lastSaved
 
   // Merge saved business state onto defaults so newly-added businesses default in.

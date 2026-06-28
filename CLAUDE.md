@@ -32,7 +32,8 @@ src/
     businesses.ts   << add a business here (data only)
     upgrades.ts     << add an upgrade here (data only)
     state.ts        initial state + SAVE_VERSION
-    engine.ts       the simulation: tick(), click(), buyUnit(), hireManager(), buyUpgrade()
+    engine.ts       the simulation: tick(), click(), buyUnit(), hireManager(), buyRental(), buyUpgrade()
+    city.ts         city layout (spiral) + real-estate config & tiers
     save.ts         serialize/deserialize + localStorage wrappers
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
@@ -79,7 +80,9 @@ block in `app.css`, an entry in `theme/themes.ts`, and a `kind: 'ui'` upgrade wi
 
 Costs and rates live entirely in `businesses.ts` / `upgrades.ts`. The cost curve is
 `baseCost × costGrowth^owned`; passive income is `revenue ÷ cycleTime`; offline is
-capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Tune there — no engine changes.
+capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Real-estate prices, rent, and the
+city tiers live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`). Tune there — no engine
+changes.
 
 ## Working on it
 
@@ -91,8 +94,8 @@ capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Tune there — no engine changes
 
 ## Roadmap (where new systems go)
 
-1. **City & real-estate** — a scrollable ASCII city (`render/ascii/`) + an
-   `engine/realestate.ts` for buying plots/buildings; village → town → city tiers.
+1. ✅ **City & real-estate** — `engine/city.ts` (spiral layout + tiers) and
+   `ui/CityMap.svelte`; buy property for rent, Hamlet → Metropolis.
 2. **Production** — resources, factories, machines, and contracts/jobs you choose.
 3. **Finance** — `engine/economy/`: checking/savings, bonds, a simulated stock
    market, FX, and loans/leverage; charts in the UI.

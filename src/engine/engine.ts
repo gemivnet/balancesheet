@@ -9,6 +9,7 @@ import Decimal from 'break_infinity.js'
 import { D } from './num'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from './businesses'
 import { UPGRADE_BY_ID } from './upgrades'
+import { REAL_ESTATE, cityTier } from './city'
 import type { BusinessId, GameState, Mults, UpgradeId } from './types'
 
 export function computeMults(state: GameState): Mults {
@@ -73,7 +74,7 @@ export class Engine {
   }
 
   totalIncomePerSec(): Decimal {
-    let sum = D(0)
+    let sum = this.rentPerSec()
     for (const b of BUSINESS_DEFS) sum = sum.add(this.businessIncomePerSec(b.id))
     return sum
   }
@@ -102,6 +103,9 @@ export class Engine {
       bs.progress = advanced - whole
       if (whole > 0) this.earn(this.cycleRevenue(def.id).mul(whole))
     }
+    // Rental income accrues continuously (no manager needed), offline too.
+    const rent = this.rentPerSec()
+    if (rent.gt(0)) this.earn(rent.mul(dt))
   }
 
   /** Cost to buy `count` more units of a business (geometric series). */
@@ -146,6 +150,33 @@ export class Engine {
     if (this.state.cash.lt(def.managerCost)) return false
     this.state.cash = this.state.cash.sub(def.managerCost)
     bs.managed = true
+    return true
+  }
+
+  // --- real estate -------------------------------------------------------
+
+  /** Businesses you've started + rental properties — drives the city tier. */
+  totalBuildings(): number {
+    let started = 0
+    for (const b of BUSINESS_DEFS) if (this.state.businesses[b.id].owned > 0) started++
+    return started + this.state.rentals
+  }
+
+  rentalCost(): Decimal {
+    return REAL_ESTATE.baseLotCost.mul(new Decimal(REAL_ESTATE.costGrowth).pow(this.state.rentals))
+  }
+
+  /** Passive rent per second across all properties (scaled by city tier). */
+  rentPerSec(): Decimal {
+    const tier = cityTier(this.totalBuildings())
+    return REAL_ESTATE.baseRent.mul(this.state.rentals).mul(tier.rentMult)
+  }
+
+  buyRental(): boolean {
+    const cost = this.rentalCost()
+    if (this.state.cash.lt(cost)) return false
+    this.state.cash = this.state.cash.sub(cost)
+    this.state.rentals++
     return true
   }
 

@@ -62,6 +62,7 @@ export interface GameState {
   upgrades: Record<UpgradeId, true> // purchased upgrade ids
   ui: { abbreviate: boolean; theme: ThemeId }
   stats: { totalClicks: number }
+  rentals: number // rental properties owned (real estate)
   lastSaved: number // epoch ms — used to compute offline progress
 }
 

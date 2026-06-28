@@ -12,9 +12,12 @@ import { applyOffline, MAX_OFFLINE_SECONDS } from '../engine/offline'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from '../engine/businesses'
 import { UPGRADE_DEFS } from '../engine/upgrades'
 import { formatMoney, formatRate, formatInt } from '../engine/num'
+import { layoutCity, cityTier } from '../engine/city'
+import type { CellKind, PlacedCell } from '../engine/city'
 import type { ThemeId } from '../engine/types'
 
 let engine = new Engine(load() ?? initialState())
+let lastCitySig = ''
 
 export interface BusinessRow {
   id: string
@@ -48,6 +51,14 @@ export interface UpgradeRow {
   kind: string
 }
 
+export interface CityCell {
+  key: string
+  kind: CellKind
+  glyph: string
+  label: string
+  businessId?: string
+}
+
 export const view = $state({
   cashText: '$0.00',
   incomeText: '$0.00/s',
@@ -59,6 +70,16 @@ export const view = $state({
   businesses: [] as BusinessRow[],
   upgrades: [] as UpgradeRow[],
   offline: null as null | { seconds: number; earnedText: string },
+  city: {
+    tierName: 'Hamlet',
+    rentalCount: 0,
+    buildingCount: 0,
+    rentText: '$0.00/s',
+    rentalCostText: '$0.00',
+    canBuyRental: false,
+    cols: 1,
+    cells: [] as CityCell[],
+  },
 })
 
 function snapshot(): void {
@@ -112,6 +133,45 @@ function snapshot(): void {
       kind: u.kind,
     }),
   )
+
+  // --- city / real estate ---
+  const total = engine.totalBuildings()
+  const tier = cityTier(total)
+  view.city.tierName = tier.name
+  view.city.buildingCount = total
+  view.city.rentalCount = s.rentals
+  view.city.rentText = formatRate(engine.rentPerSec(), ab)
+  const rentalCost = engine.rentalCost()
+  view.city.rentalCostText = formatMoney(rentalCost, ab)
+  view.city.canBuyRental = s.cash.gte(rentalCost)
+
+  // Rebuild the (clickable) grid only when its structure actually changes.
+  const started = BUSINESS_DEFS.filter((b) => s.businesses[b.id].owned > 0)
+  const sig = `${started.map((b) => b.id).join(',')}|${s.rentals}|${tier.index}`
+  if (sig !== lastCitySig) {
+    lastCitySig = sig
+    const layout = layoutCity({
+      startedBusinesses: started.map((b) => ({ id: b.id, glyph: b.glyph, name: b.name })),
+      rentals: s.rentals,
+      tier,
+    })
+    const byPos = new Map<string, PlacedCell>()
+    for (const c of layout.cells) byPos.set(`${c.x},${c.y}`, c)
+    const cells: CityCell[] = []
+    for (let y = layout.minY; y <= layout.maxY; y++) {
+      for (let x = layout.minX; x <= layout.maxX; x++) {
+        const key = `${x},${y}`
+        const placed = byPos.get(key)
+        cells.push(
+          placed
+            ? { key, kind: placed.kind, glyph: placed.glyph, label: placed.label, businessId: placed.businessId }
+            : { key, kind: 'empty', glyph: '·', label: '' },
+        )
+      }
+    }
+    view.city.cols = layout.maxX - layout.minX + 1
+    view.city.cells = cells
+  }
 }
 
 // ---- actions -------------------------------------------------------------
@@ -156,6 +216,11 @@ export function setActive(id: string): void {
   }
 }
 
+export function buyRental(): void {
+  engine.buyRental()
+  snapshot()
+}
+
 export function dismissOffline(): void {
   view.offline = null
 }
@@ -177,6 +242,7 @@ export function importSave(raw: string): boolean {
   try {
     engine = new Engine(deserialize(raw))
     save(engine.state)
+    lastCitySig = ''
     snapshot()
     return true
   } catch {
@@ -187,6 +253,7 @@ export function importSave(raw: string): boolean {
 export function resetGame(): void {
   clearSave()
   engine = new Engine(initialState())
+  lastCitySig = ''
   snapshot()
 }
 
