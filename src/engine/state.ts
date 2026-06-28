@@ -18,7 +18,7 @@ export function initialState(): GameState {
     activeBusinessId: BUSINESS_DEFS[0].id,
     businesses: initialBusinessStates(),
     upgrades: {},
-    ui: { abbreviate: false, theme: 'mono', cityGrid: false },
+    ui: { abbreviate: false, theme: 'mono', cityGrid: false, iso: false },
     stats: { totalClicks: 0 },
     rentals: 0,
     densityLevel: 0,

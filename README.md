@@ -10,9 +10,9 @@ now; a scrollable city map, factories, and a finance market (stocks, bonds, FX,
 loans) are on the roadmap.
 
 > **Status: playable** — clicking → idle income, businesses & deep upgrade trees, a
-> scrollable city with real estate + density, a production chain (factories, machines,
-> contracts, a sell market), a finance market (savings, loans, bonds, stocks, FX), plus
-> save + offline earnings and unlockable UI themes.
+> city with real estate + density that upgrades from ASCII to a 3D **isometric** view,
+> a production chain (factories, machines, contracts, a sell market), a finance market
+> (savings, loans, bonds, stocks, FX), plus save + offline earnings and UI themes.
 
 ## Run it
 
@@ -55,6 +55,9 @@ or move it between machines.
 Clicking is always useful — it instantly completes a work-cycle on top of any
 idle income, so there's never any downtime.
 
+Spend on **UI upgrades** in the shop too: number formatting, colour themes, city
+gridlines, and ultimately a full **3D isometric** city view.
+
 ## Architecture
 
 The simulation is **pure TypeScript** (`src/engine/`) with no Svelte or DOM
@@ -67,17 +70,19 @@ rewrite. See [CLAUDE.md](./CLAUDE.md) for the full map and how to add content.
 src/
   engine/   pure sim: businesses, city/real-estate, production, finance (market/bonds/loans), save, offline
   store/    Svelte bridge: tick loop + reactive view snapshot
-  ui/       ASCII components, organised into Work / City / Industry / Finance tabs (sticky HUD)
+  ui/       Work / City / Industry / Finance tabs; city renders as ASCII or a 3D isometric canvas
   render/   renderer seam (the isometric city lands here later)
   theme/    UI theme tiers unlocked as upgrades
 ```
 
 ## Roadmap
 
-- **Done** — clicker → idle, businesses & upgrades, a scrollable ASCII city with a
-  real-estate agency + housing density, a production chain (factories, machines,
-  contracts, a sell market), and a finance market (savings, loans, bonds, stocks, FX).
-- **Next** — the isometric "Habbo" UI as the ultimate UI upgrade.
+All the original pillars are in: businesses & upgrades, a production chain, real
+estate + a city that grows from **ASCII to a 3D isometric view**, and a finance
+market.
+
+Possible next steps: a prestige/reset layer, achievements, animated isometric
+characters, and balance passes.
 
 ## License
 

@@ -857,3 +857,33 @@ button.tile.forSale {
 .inst-btns button {
   font-size: 11px;
 }
+
+/* isometric city */
+.iso-wrap {
+  border: 1px solid var(--line);
+  height: 380px;
+  overflow: hidden;
+  position: relative;
+  background: #bfe3f5;
+  cursor: grab;
+}
+.iso-wrap:active {
+  cursor: grabbing;
+}
+.iso-canvas {
+  display: block;
+  touch-action: none;
+}
+.city-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.city-switch button {
+  font-size: 11px;
+  padding: 2px 12px;
+}
+.city-switch button.active {
+  background: var(--fg);
+  color: var(--bg);
+}

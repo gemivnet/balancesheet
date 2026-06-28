@@ -83,6 +83,8 @@ export interface UpgradeRow {
 
 export interface CityCell {
   key: string
+  x: number
+  y: number
   kind: CellKind
   glyph: string
   label: string
@@ -180,6 +182,7 @@ export const view = $state({
   abbreviate: false,
   theme: 'mono' as ThemeId,
   cityGrid: false,
+  cityIso: false,
   themes: [] as ThemeRow[],
   activeName: '',
   businesses: [] as BusinessRow[],
@@ -232,6 +235,7 @@ function snapshot(): void {
   view.abbreviate = ab
   view.theme = s.ui.theme
   view.cityGrid = s.ui.cityGrid
+  view.cityIso = s.ui.iso
   view.themes = THEME_ORDER.map((id): ThemeRow => ({
     id,
     label: THEMES[id].label,
@@ -337,8 +341,8 @@ function snapshot(): void {
         const placed = byPos.get(key)
         cells.push(
           placed
-            ? { key, kind: placed.kind, glyph: placed.glyph, label: placed.label, businessId: placed.businessId }
-            : { key, kind: 'empty', glyph: '·', label: '' },
+            ? { key, x, y, kind: placed.kind, glyph: placed.glyph, label: placed.label, businessId: placed.businessId }
+            : { key, x, y, kind: 'empty', glyph: '·', label: '' },
         )
       }
     }

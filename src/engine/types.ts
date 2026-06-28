@@ -32,7 +32,7 @@ export type UpgradeKind =
 
 export type ThemeId = 'mono' | 'gray' | 'dark' | 'amber' | 'blue'
 
-export type UiFlag = 'cityGrid'
+export type UiFlag = 'cityGrid' | 'iso'
 
 export type UiEffect =
   | { type: 'abbreviate' }
@@ -149,7 +149,7 @@ export interface GameState {
   activeBusinessId: BusinessId // which business "you" are personally working
   businesses: Record<BusinessId, BusinessState>
   upgrades: Record<UpgradeId, true> // purchased upgrade ids
-  ui: { abbreviate: boolean; theme: ThemeId; cityGrid: boolean }
+  ui: { abbreviate: boolean; theme: ThemeId; cityGrid: boolean; iso: boolean }
   stats: { totalClicks: number }
   rentals: number // rental properties owned (real estate)
   densityLevel: number // housing density tier (boosts rent, denser buildings)

@@ -120,4 +120,11 @@ describe('upgrades', () => {
     expect(e.buyUpgrade('ui_abbrev')).toBe(true)
     expect(e.state.ui.abbreviate).toBe(true)
   })
+
+  it('ui flag upgrades set their flag (isometric city)', () => {
+    const e = newEngine(5e6)
+    expect(e.state.ui.iso).toBe(false)
+    expect(e.buyUpgrade('ui_iso')).toBe(true)
+    expect(e.state.ui.iso).toBe(true)
+  })
 })

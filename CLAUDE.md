@@ -43,8 +43,8 @@ src/
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
   store/game.svelte.ts   tick loop + the reactive `view` snapshot + all actions
-  ui/             Svelte components, organised into Work / City / Industry tabs
-  render/         renderer seam for the future isometric city
+  ui/             Work / City / Industry / Finance tabs; CityView swaps ASCII <-> IsoCity (canvas)
+  render/         Renderer interface (the iso renderer itself lives in ui/IsoCity.svelte)
   theme/          UI theme tiers
 ```
 
@@ -112,5 +112,8 @@ Tune there — no engine changes.
    goods → contracts you choose, in the Industry tab.
 3. ✅ **Finance** — `market.ts` + `finance.ts`: savings, loans, bonds, and a live
    stock/FX market (prices move online only). UI in the Finance tab.
-4. **Isometric UI** — a canvas `Renderer` in `render/iso/` sold to the player as
-   the ultimate "UI upgrade", with sprites and walking characters.
+4. ✅ **Isometric UI** — `ui/IsoCity.svelte` draws the city as an isometric canvas,
+   unlocked by the `ui_iso` upgrade; `CityView` toggles ASCII <-> isometric.
+
+All four roadmap pillars are in. Future ideas: prestige/reset, achievements, and
+animated isometric characters.

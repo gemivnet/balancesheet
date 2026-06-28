@@ -82,6 +82,7 @@ export const UI_UPGRADES: UpgradeDef[] = [
   { id: 'ui_gray', name: 'Interior Decorator', desc: 'Upgrade the UI: grayscale theme', cost: D(50000), kind: 'ui', factor: 1, ui: { type: 'theme', theme: 'gray' } },
   { id: 'ui_amber', name: 'Amber Monitor', desc: 'Upgrade the UI: warm amber theme', cost: D(200000), kind: 'ui', factor: 1, ui: { type: 'theme', theme: 'amber' } },
   { id: 'ui_blue', name: 'Blueprint', desc: 'Upgrade the UI: blueprint theme', cost: D(2e6), kind: 'ui', factor: 1, ui: { type: 'theme', theme: 'blue' } },
+  { id: 'ui_iso', name: 'Isometric City', desc: 'Render your whole city as a colourful 3D isometric world', cost: D(2500000), kind: 'ui', factor: 1, ui: { type: 'flag', flag: 'iso' } },
 ]
 
 export const UPGRADE_DEFS: UpgradeDef[] = [

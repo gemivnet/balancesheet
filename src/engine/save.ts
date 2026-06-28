@@ -21,7 +21,7 @@ interface SavedShape {
   activeBusinessId: string
   businesses: Record<string, { owned: number; managed: boolean; progress: number }>
   upgrades: Record<string, true>
-  ui: { abbreviate: boolean; theme: string; cityGrid: boolean }
+  ui: { abbreviate: boolean; theme: string; cityGrid: boolean; iso: boolean }
   stats: { totalClicks: number }
   rentals: number
   densityLevel: number
@@ -52,7 +52,7 @@ export function serialize(state: GameState): string {
       ]),
     ),
     upgrades: { ...state.upgrades },
-    ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme, cityGrid: state.ui.cityGrid },
+    ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme, cityGrid: state.ui.cityGrid, iso: state.ui.iso },
     stats: { totalClicks: state.stats.totalClicks },
     rentals: state.rentals,
     densityLevel: state.densityLevel,
@@ -82,6 +82,7 @@ export function deserialize(raw: string): GameState {
   if (data.ui) {
     state.ui.abbreviate = !!data.ui.abbreviate
     state.ui.cityGrid = !!data.ui.cityGrid
+    state.ui.iso = !!data.ui.iso
     const themes: ThemeId[] = ['mono', 'gray', 'dark', 'amber', 'blue']
     if (themes.includes(data.ui.theme as ThemeId)) state.ui.theme = data.ui.theme as ThemeId
   }

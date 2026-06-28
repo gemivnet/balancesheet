@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { view, startGame, stopGame } from './store/game.svelte'
   import Hud from './ui/Hud.svelte'
-  import CityMap from './ui/CityMap.svelte'
+  import CityView from './ui/CityView.svelte'
   import ClickButton from './ui/ClickButton.svelte'
   import BusinessList from './ui/BusinessList.svelte'
   import Shop from './ui/Shop.svelte'
@@ -54,7 +54,7 @@
       </section>
     </main>
   {:else if tab === 'city'}
-    <CityMap />
+    <CityView />
     <RealEstate />
   {:else if tab === 'industry'}
     <Industry />
