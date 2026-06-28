@@ -62,7 +62,7 @@ rewrite. See [CLAUDE.md](./CLAUDE.md) for the full map and how to add content.
 src/
   engine/   pure sim: businesses, city/real-estate, production, finance (market/bonds/loans), save, offline
   store/    Svelte bridge: tick loop + reactive view snapshot
-  ui/       city-first UI: full-screen ASCII/isometric city + click-to-open popups (HQ, Town Hall, Realtor, Factory, Bank)
+  ui/       full-screen city backdrop + draggable, persistent floating windows opened by clicking buildings
   render/   Renderer interface seam (the iso renderer is ui/IsoCity.svelte)
   theme/    UI theme tiers unlocked as upgrades
 ```

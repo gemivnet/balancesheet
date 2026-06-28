@@ -9,8 +9,8 @@
 
 <div class="city-view">
   {#if view.cityIso}
-    <div class="city-switch">
-      <button class:active={mode === 'iso'} onclick={() => (mode = 'iso')}>Isometric</button>
+    <div class="city-toggle">
+      <button class:active={mode === 'iso'} onclick={() => (mode = 'iso')}>Iso</button>
       <button class:active={mode === 'ascii'} onclick={() => (mode = 'ascii')}>ASCII</button>
     </div>
     {#if mode === 'iso'}

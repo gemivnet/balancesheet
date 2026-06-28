@@ -43,7 +43,7 @@ src/
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
   store/game.svelte.ts   tick loop + the reactive `view` snapshot + all actions
-  ui/             city-first UI: full-screen city (CityView: ASCII/IsoCity) + Popup menus from clicking buildings
+  ui/             full-screen city (CityView: ASCII/IsoCity) + draggable FloatingWindow panels from clicking buildings
   render/         Renderer interface (the iso renderer itself lives in ui/IsoCity.svelte)
   theme/          UI theme tiers
 ```
@@ -69,8 +69,9 @@ listed before the factories that consume them so a chain flows within one tick.
 
 **A new job type:** extend `ContractType` in `types.ts` and add a branch in
 `generateContract` (`contracts.ts`). **A new civic building / menu:** add to
-`CIVIC_DEFS` in `city.ts` (it appears in the city, clickable) and render its popup with
-a `{:else if uiState.menu === '<menu>'}` branch in `App.svelte`.
+`CIVIC_DEFS` in `city.ts` (it appears in the city, clickable) and add a title + content
+branch for its window id in the `{#each uiState.windows}` block in `App.svelte`. Windows
+are opened/closed/focused via `openMenu`/`closeMenu`/`focusMenu` in the store.
 
 ## Saves — don't break them
 

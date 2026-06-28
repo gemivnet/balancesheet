@@ -20,7 +20,6 @@
 
   let panX = 0
   let panY = 0
-  let selected = $state('Click a building to manage it · drag to pan.')
 
   let dragging = false
   let moved = false
@@ -189,10 +188,7 @@
   function up(e: PointerEvent) {
     if (dragging && !moved) {
       const c = pick(e.clientX, e.clientY)
-      if (c && c.kind !== 'empty') {
-        onTile(c)
-        selected = c.kind === 'civic' ? c.label : c.label || 'empty lot'
-      }
+      if (c && c.kind !== 'empty') onTile(c)
     }
     dragging = false
   }
@@ -216,12 +212,7 @@
   })
 </script>
 
-<div class="panel city">
-  <div class="city-head">
-    <h2>YOUR CITY · {view.city.tierName}</h2>
-    <span class="city-meta">{view.city.buildingCount} buildings · rent {view.city.rentText}</span>
-    <button class="mini" onclick={recenter}>recenter</button>
-  </div>
+<div class="city-render">
   <div class="iso-wrap" bind:this={wrap}>
     <canvas
       bind:this={canvas}
@@ -232,8 +223,5 @@
       onpointerleave={up}
     ></canvas>
   </div>
-  <div class="city-foot">
-    <span class="legend">click the labelled buildings (Town Hall, Bank…) or your shops to manage them</span>
-    <span class="selected">{selected}</span>
-  </div>
+  <button class="city-recenter mini" onclick={recenter}>recenter</button>
 </div>

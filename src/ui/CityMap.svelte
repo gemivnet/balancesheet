@@ -4,7 +4,6 @@
   import type { CityCell } from '../store/game.svelte'
 
   let viewport: HTMLDivElement
-  let selected = $state('Scroll or drag to explore. Click a building to interact.')
 
   // drag-to-pan with a small threshold so a drag isn't read as a tile click
   let panning = false
@@ -44,7 +43,6 @@
     } else if (cell.kind === 'rental' || cell.kind === 'forSale') {
       openMenu('realestate')
     }
-    selected = cell.label || 'empty lot'
   }
 
   function recenter() {
@@ -56,13 +54,7 @@
   onMount(recenter)
 </script>
 
-<div class="panel city">
-  <div class="city-head">
-    <h2>YOUR CITY · {view.city.tierName}</h2>
-    <span class="city-meta">{view.city.buildingCount} buildings · rent {view.city.rentText}</span>
-    <button class="mini" onclick={recenter}>recenter</button>
-  </div>
-
+<div class="city-render">
   <div
     class="city-viewport"
     bind:this={viewport}
@@ -85,9 +77,5 @@
       {/each}
     </div>
   </div>
-
-  <div class="city-foot">
-    <span class="legend">shops + civic buildings (T·R·H·F·B = Town Hall, Realtor, HQ, Factory, Bank) — click to manage</span>
-    <span class="selected">{selected}</span>
-  </div>
+  <button class="city-recenter mini" onclick={recenter}>recenter</button>
 </div>

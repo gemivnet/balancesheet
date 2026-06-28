@@ -53,13 +53,28 @@ function contractDemand(c: Contract): string {
   return c.items.map((it) => `${it.amount} ${RESOURCE_BY_ID[it.resource].name}`).join(' + ')
 }
 
-/** Which popup menu is open in the city-first UI (not part of the snapshot/save). */
-export const uiState = $state({ menu: null as string | null })
+/** Open floating windows, in z-order (last = top). Not part of the snapshot/save. */
+export const uiState = $state({ windows: [] as string[] })
+
+/** Open a window (or bring it to the front if already open). */
 export function openMenu(id: string): void {
-  uiState.menu = id
+  const i = uiState.windows.indexOf(id)
+  if (i !== -1) uiState.windows.splice(i, 1)
+  uiState.windows.push(id)
 }
-export function closeMenu(): void {
-  uiState.menu = null
+
+export function closeMenu(id: string): void {
+  const i = uiState.windows.indexOf(id)
+  if (i !== -1) uiState.windows.splice(i, 1)
+}
+
+/** Bring a window to the front. */
+export function focusMenu(id: string): void {
+  const i = uiState.windows.indexOf(id)
+  if (i !== -1 && i !== uiState.windows.length - 1) {
+    uiState.windows.splice(i, 1)
+    uiState.windows.push(id)
+  }
 }
 
 export interface BusinessRow {
