@@ -40,10 +40,12 @@ describe('layoutCity', () => {
       rentals: 1,
       rentalGlyph: 'n',
     })
-    expect(layout.cells).toHaveLength(3)
-    expect(layout.cells[0]).toMatchObject({ x: 0, y: 0, kind: 'business', businessId: 'lemonade' })
-    expect(layout.cells[1].kind).toBe('rental')
-    expect(layout.cells[2].kind).toBe('forSale')
+    const kinds = layout.cells.map((c) => c.kind)
+    expect(layout.cells.filter((c) => c.kind === 'civic')).toHaveLength(5)
+    expect(layout.cells.find((c) => c.kind === 'business')).toMatchObject({ businessId: 'lemonade' })
+    expect(kinds).toContain('rental')
+    expect(kinds).toContain('forSale')
+    expect(layout.cells).toHaveLength(8) // 5 civic + business + rental + for-sale
     expect(layout.minX).toBeLessThan(0)
     expect(layout.maxX).toBeGreaterThan(0)
   })

@@ -1,24 +1,18 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { view, startGame, stopGame } from './store/game.svelte'
-  import Hud from './ui/Hud.svelte'
+  import { view, uiState, startGame, stopGame } from './store/game.svelte'
+  import GameHud from './ui/GameHud.svelte'
   import CityView from './ui/CityView.svelte'
-  import ClickButton from './ui/ClickButton.svelte'
-  import BusinessList from './ui/BusinessList.svelte'
+  import Popup from './ui/Popup.svelte'
+  import Operations from './ui/Operations.svelte'
   import Shop from './ui/Shop.svelte'
+  import Contracts from './ui/Contracts.svelte'
   import RealEstate from './ui/RealEstate.svelte'
-  import Industry from './ui/Industry.svelte'
+  import ResourcesBar from './ui/ResourcesBar.svelte'
+  import Production from './ui/Production.svelte'
   import Finance from './ui/Finance.svelte'
+  import Settings from './ui/Settings.svelte'
   import OfflineModal from './ui/OfflineModal.svelte'
-  import SaveBar from './ui/SaveBar.svelte'
-
-  const logo = `+-------------------------------------------+
-|         A S C I I   T Y C O O N            |
-|   from a lemonade stand to a metropolis    |
-+-------------------------------------------+`
-
-  type Tab = 'work' | 'city' | 'industry' | 'finance'
-  let tab = $state<Tab>('work')
 
   onMount(() => {
     startGame()
@@ -26,43 +20,39 @@
   })
 </script>
 
-<div class="app theme-{view.theme}">
-  <header class="banner">
-    <pre class="logo">{logo}</pre>
-  </header>
+<div class="app game theme-{view.theme}">
+  <GameHud />
 
-  <div class="sticky-top">
-    <Hud />
-    <nav class="tabs">
-      <button class:active={tab === 'work'} onclick={() => (tab = 'work')}>Work</button>
-      <button class:active={tab === 'city'} onclick={() => (tab = 'city')}>City</button>
-      <button class:active={tab === 'industry'} onclick={() => (tab = 'industry')}>Industry</button>
-      {#if view.finance.unlocked}
-        <button class:active={tab === 'finance'} onclick={() => (tab = 'finance')}>Finance</button>
-      {/if}
-    </nav>
-  </div>
-
-  {#if tab === 'work'}
-    <main class="columns">
-      <section class="col">
-        <ClickButton />
-        <BusinessList />
-      </section>
-      <section class="col">
-        <Shop />
-      </section>
-    </main>
-  {:else if tab === 'city'}
+  <main class="stage">
     <CityView />
-    <RealEstate />
-  {:else if tab === 'industry'}
-    <Industry />
-  {:else if tab === 'finance'}
-    <Finance />
-  {/if}
+  </main>
 
-  <SaveBar />
+  {#if uiState.menu === 'ops'}
+    <Popup title="OPERATIONS"><Operations /></Popup>
+  {:else if uiState.menu === 'hq'}
+    <Popup title="HEADQUARTERS — UPGRADES"><Shop /></Popup>
+  {:else if uiState.menu === 'jobs'}
+    <Popup title="TOWN HALL — JOBS"><Contracts /></Popup>
+  {:else if uiState.menu === 'realestate'}
+    <Popup title="REAL ESTATE"><RealEstate /></Popup>
+  {:else if uiState.menu === 'factory'}
+    <Popup title="FACTORY">
+      <ResourcesBar />
+      <Production />
+    </Popup>
+  {:else if uiState.menu === 'bank'}
+    <Popup title="BANK">
+      {#if view.finance.unlocked}
+        <Finance />
+      {:else}
+        <p class="locked-note">
+          The bank opens once you've earned <strong>$2,000</strong> in total. Keep building!
+        </p>
+      {/if}
+    </Popup>
+  {:else if uiState.menu === 'settings'}
+    <Popup title="SETTINGS"><Settings /></Popup>
+  {/if}
 
   {#if view.offline}
     <OfflineModal />

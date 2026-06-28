@@ -327,7 +327,7 @@ export class Engine {
   // --- contracts ---------------------------------------------------------
 
   canDeliver(c: Contract): boolean {
-    return this.state.resources[c.resource].gte(c.amount)
+    return c.items.every((it) => this.state.resources[it.resource].gte(it.amount))
   }
 
   acceptContract(id: number): boolean {
@@ -355,7 +355,9 @@ export class Engine {
     if (idx < 0) return false
     const c = board.active[idx]
     if (!this.canDeliver(c)) return false
-    this.state.resources[c.resource] = this.state.resources[c.resource].sub(c.amount)
+    for (const it of c.items) {
+      this.state.resources[it.resource] = this.state.resources[it.resource].sub(it.amount)
+    }
     this.earn(D(c.reward))
     board.active.splice(idx, 1)
     return true

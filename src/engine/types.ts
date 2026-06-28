@@ -82,11 +82,18 @@ export interface FacilityState {
   owned: number
 }
 
-/** A job: deliver `amount` of `resource` before the timer for a cash `reward`. */
-export interface Contract {
-  id: number
+export type ContractType = 'delivery' | 'rush' | 'bulk' | 'supply'
+
+export interface ContractItem {
   resource: ResourceId
   amount: number
+}
+
+/** A job: deliver the listed items before the timer for a cash `reward`. */
+export interface Contract {
+  id: number
+  type: ContractType
+  items: ContractItem[]
   reward: number
   timeLimit: number
   remaining: number // seconds left once accepted

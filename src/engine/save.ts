@@ -8,9 +8,9 @@ import { initialState, SAVE_VERSION } from './state'
 import { BUSINESS_DEFS } from './businesses'
 import { RESOURCE_DEFS } from './resources'
 import { FACILITY_DEFS } from './facilities'
-import { FIRST_OFFER_DELAY } from './contracts'
+import { FIRST_OFFER_DELAY, normalizeContract } from './contracts'
 import { INSTRUMENT_DEFS } from './market'
-import type { Bond, ContractBoard, GameState, ThemeId } from './types'
+import type { Bond, Contract, ContractBoard, GameState, ThemeId } from './types'
 
 const SAVE_KEY = 'ascii-tycoon-save'
 
@@ -106,9 +106,11 @@ export function deserialize(raw: string): GameState {
     Array.isArray(data.contracts.available) &&
     Array.isArray(data.contracts.active)
   ) {
+    const norm = (arr: unknown[]): Contract[] =>
+      arr.map(normalizeContract).filter((c): c is Contract => c !== null)
     state.contracts = {
-      available: data.contracts.available,
-      active: data.contracts.active,
+      available: norm(data.contracts.available),
+      active: norm(data.contracts.active),
       nextId: data.contracts.nextId ?? 1,
       refreshTimer: data.contracts.refreshTimer ?? FIRST_OFFER_DELAY,
     }

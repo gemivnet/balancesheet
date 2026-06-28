@@ -43,7 +43,7 @@ src/
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
   store/game.svelte.ts   tick loop + the reactive `view` snapshot + all actions
-  ui/             Work / City / Industry / Finance tabs; CityView swaps ASCII <-> IsoCity (canvas)
+  ui/             city-first UI: full-screen city (CityView: ASCII/IsoCity) + Popup menus from clicking buildings
   render/         Renderer interface (the iso renderer itself lives in ui/IsoCity.svelte)
   theme/          UI theme tiers
 ```
@@ -66,6 +66,11 @@ block in `app.css`, an entry in `theme/themes.ts`, and a `kind: 'ui'` upgrade wi
 **A new facility:** add to `FACILITY_DEFS` in `facilities.ts` (inputs/outputs are per
 owned unit, per second). Machine upgrades generate automatically. Keep producers
 listed before the factories that consume them so a chain flows within one tick.
+
+**A new job type:** extend `ContractType` in `types.ts` and add a branch in
+`generateContract` (`contracts.ts`). **A new civic building / menu:** add to
+`CIVIC_DEFS` in `city.ts` (it appears in the city, clickable) and render its popup with
+a `{:else if uiState.menu === '<menu>'}` branch in `App.svelte`.
 
 ## Saves — don't break them
 

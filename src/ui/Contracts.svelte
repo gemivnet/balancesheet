@@ -13,7 +13,7 @@
       {#each view.industry.offers as c (c.id)}
         <div class="contract">
           <div class="c-main">
-            <span class="c-demand">{c.glyph} {c.demandText}</span>
+            <span class="c-demand"><span class="c-type">{c.typeText}</span> {c.demandText}</span>
             <span class="c-reward">{c.rewardText}</span>
           </div>
           <div class="c-sub">
@@ -35,7 +35,7 @@
       {#each view.industry.active as c (c.id)}
         <div class="contract" class:ready={c.canDeliver}>
           <div class="c-main">
-            <span class="c-demand">{c.glyph} {c.demandText}</span>
+            <span class="c-demand"><span class="c-type">{c.typeText}</span> {c.demandText}</span>
             <span class="c-reward">{c.rewardText}</span>
           </div>
           <div class="c-sub">

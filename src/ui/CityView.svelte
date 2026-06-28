@@ -7,16 +7,18 @@
   let mode = $state<'iso' | 'ascii'>('iso')
 </script>
 
-{#if view.cityIso}
-  <div class="city-switch">
-    <button class:active={mode === 'iso'} onclick={() => (mode = 'iso')}>Isometric</button>
-    <button class:active={mode === 'ascii'} onclick={() => (mode = 'ascii')}>ASCII</button>
-  </div>
-  {#if mode === 'iso'}
-    <IsoCity />
+<div class="city-view">
+  {#if view.cityIso}
+    <div class="city-switch">
+      <button class:active={mode === 'iso'} onclick={() => (mode = 'iso')}>Isometric</button>
+      <button class:active={mode === 'ascii'} onclick={() => (mode = 'ascii')}>ASCII</button>
+    </div>
+    {#if mode === 'iso'}
+      <IsoCity />
+    {:else}
+      <CityMap />
+    {/if}
   {:else}
     <CityMap />
   {/if}
-{:else}
-  <CityMap />
-{/if}
+</div>

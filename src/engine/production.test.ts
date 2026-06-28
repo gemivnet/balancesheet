@@ -64,7 +64,15 @@ describe('production', () => {
 
 describe('contracts', () => {
   function order(over: Partial<Contract> = {}): Contract {
-    return { id: 1, resource: 'wood', amount: 5, reward: 100, timeLimit: 60, remaining: 60, ...over }
+    return {
+      id: 1,
+      type: 'delivery',
+      items: [{ resource: 'wood', amount: 5 }],
+      reward: 100,
+      timeLimit: 60,
+      remaining: 60,
+      ...over,
+    }
   }
 
   it('accept then deliver consumes resources and pays the reward', () => {

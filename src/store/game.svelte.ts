@@ -12,15 +12,15 @@ import { applyOffline, MAX_OFFLINE_SECONDS } from '../engine/offline'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from '../engine/businesses'
 import { UPGRADE_DEFS } from '../engine/upgrades'
 import { D, formatMoney, formatRate, formatInt, formatQty } from '../engine/num'
-import { layoutCity, cityTier, densityGlyph, densityName } from '../engine/city'
+import { layoutCity, cityTier, densityGlyph, densityName, CIVIC_BY_ID } from '../engine/city'
 import { FACILITY_DEFS } from '../engine/facilities'
 import { RESOURCE_DEFS, RESOURCE_BY_ID } from '../engine/resources'
 import { MAX_ACTIVE } from '../engine/contracts'
 import { INSTRUMENT_DEFS } from '../engine/market'
 import { BOND_PRODUCTS, BOND_BY_ID, SAVINGS_APR, LOAN_APR } from '../engine/finance'
 import { THEMES } from '../theme/themes'
-import type { CellKind, PlacedCell } from '../engine/city'
-import type { ResourceId, ThemeId } from '../engine/types'
+import type { CellKind, PlacedCell, CivicId } from '../engine/city'
+import type { Contract, ResourceId, ThemeId } from '../engine/types'
 
 let engine = new Engine(load() ?? initialState())
 let lastCitySig = ''
@@ -47,6 +47,19 @@ function sparkline(history: number[]): string {
   return history
     .map((v) => SPARK[Math.min(SPARK.length - 1, Math.round(((v - min) / range) * (SPARK.length - 1)))])
     .join('')
+}
+
+function contractDemand(c: Contract): string {
+  return c.items.map((it) => `${it.amount} ${RESOURCE_BY_ID[it.resource].name}`).join(' + ')
+}
+
+/** Which popup menu is open in the city-first UI (not part of the snapshot/save). */
+export const uiState = $state({ menu: null as string | null })
+export function openMenu(id: string): void {
+  uiState.menu = id
+}
+export function closeMenu(): void {
+  uiState.menu = null
 }
 
 export interface BusinessRow {
@@ -89,6 +102,8 @@ export interface CityCell {
   glyph: string
   label: string
   businessId?: string
+  civic?: CivicId
+  menu?: string
 }
 
 export interface ResourceRow {
@@ -128,6 +143,7 @@ export interface FacilityRow {
 export interface OfferRow {
   id: number
   glyph: string
+  typeText: string
   demandText: string
   rewardText: string
   timeText: string
@@ -137,6 +153,7 @@ export interface OfferRow {
 export interface ActiveRow {
   id: number
   glyph: string
+  typeText: string
   demandText: string
   rewardText: string
   remainingText: string
@@ -341,7 +358,17 @@ function snapshot(): void {
         const placed = byPos.get(key)
         cells.push(
           placed
-            ? { key, x, y, kind: placed.kind, glyph: placed.glyph, label: placed.label, businessId: placed.businessId }
+            ? {
+                key,
+                x,
+                y,
+                kind: placed.kind,
+                glyph: placed.glyph,
+                label: placed.label,
+                businessId: placed.businessId,
+                civic: placed.civic,
+                menu: placed.civic ? CIVIC_BY_ID[placed.civic].menu : undefined,
+              }
             : { key, x, y, kind: 'empty', glyph: '·', label: '' },
         )
       }
@@ -404,16 +431,18 @@ function snapshot(): void {
   const board = s.contracts
   view.industry.offers = board.available.map((c): OfferRow => ({
     id: c.id,
-    glyph: RESOURCE_BY_ID[c.resource].glyph,
-    demandText: `${c.amount} ${RESOURCE_BY_ID[c.resource].name}`,
+    glyph: RESOURCE_BY_ID[c.items[0].resource].glyph,
+    typeText: c.type.toUpperCase(),
+    demandText: contractDemand(c),
     rewardText: formatMoney(D(c.reward), ab),
     timeText: `${c.timeLimit}s limit`,
     canAccept: board.active.length < MAX_ACTIVE,
   }))
   view.industry.active = board.active.map((c): ActiveRow => ({
     id: c.id,
-    glyph: RESOURCE_BY_ID[c.resource].glyph,
-    demandText: `${c.amount} ${RESOURCE_BY_ID[c.resource].name}`,
+    glyph: RESOURCE_BY_ID[c.items[0].resource].glyph,
+    typeText: c.type.toUpperCase(),
+    demandText: contractDemand(c),
     rewardText: formatMoney(D(c.reward), ab),
     remainingText: `${Math.max(0, Math.ceil(c.remaining))}s`,
     canDeliver: engine.canDeliver(c),

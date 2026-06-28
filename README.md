@@ -9,10 +9,10 @@ automate them, then watch the money pile up while you're away. Grounded economic
 now; a scrollable city map, factories, and a finance market (stocks, bonds, FX,
 loans) are on the roadmap.
 
-> **Status: playable** — clicking → idle income, businesses & deep upgrade trees, a
-> city with real estate + density that upgrades from ASCII to a 3D **isometric** view,
-> a production chain (factories, machines, contracts, a sell market), a finance market
-> (savings, loans, bonds, stocks, FX), plus save + offline earnings and UI themes.
+> **Status: playable** — a **city-first** game: the isometric/ASCII city fills the
+> screen and you click its buildings to run everything — shops, jobs, real estate,
+> factories, finance — with deep upgrades, varied job contracts, save + offline
+> earnings, and unlockable UI themes.
 
 ## Run it
 
@@ -36,27 +36,19 @@ or move it between machines.
 
 ## How to play
 
-1. Hit **WORK** to earn cash from the business you're personally working.
-2. **Buy units** (buy 1 / buy max) to scale a business up.
-3. **Hire a manager** to automate it — now it earns while you're idle.
-4. Spend in the **UPGRADES** shop: ×2 revenue, faster cycles, stronger clicks…
-   plus **UI upgrades** that literally improve the interface.
-5. Build your **city**: buy **property** (Real Estate panel, or click a pulsing `$`
-   lot) for rent, then **raise density** to redevelop your blocks into taller
-   buildings — growing from a Hamlet into a Metropolis.
-6. Open the **Industry** tab: build **factories** to turn raw materials into goods,
-   add **machines** to boost output, **sell** surplus on the spot market, and accept
-   **contracts** to deliver goods for cash before the deadline.
-7. Once you've earned enough, a **Finance** tab unlocks: park cash in **savings**,
-   take a **loan** to expand faster, buy **bonds**, and trade the **stock & FX**
-   markets (prices move live while you play).
-8. Close the tab and come back later for **offline earnings**.
+The **city is the game** — click its buildings to do everything:
 
-Clicking is always useful — it instantly completes a work-cycle on top of any
-idle income, so there's never any downtime.
+- **Your shops** → hit **WORK** to earn, buy units, and hire managers to automate them.
+- **HQ** → buy upgrades: stronger clicks, global income, and **UI upgrades** (themes,
+  city gridlines, and the colourful **isometric** city).
+- **Town Hall** → take **jobs**. Types vary: quick **rush** orders, big **bulk** orders,
+  two-resource **supply** runs, and steady **delivery** orders.
+- **Realtor** → buy **property** for rent and raise **housing density** (Hamlet → Metropolis).
+- **Factory** → build factories + machines and **sell** resources on the spot market.
+- **Bank** (unlocks at $2,000 earned) → savings, loans, bonds, and the live stock/FX market.
 
-Spend on **UI upgrades** in the shop too: number formatting, colour themes, city
-gridlines, and ultimately a full **3D isometric** city view.
+Clicking **WORK** is always useful. Hire managers and build to earn while idle, then come
+back later for **offline earnings**. The ⚙ menu (top-right) holds save/export and themes.
 
 ## Architecture
 
@@ -70,8 +62,8 @@ rewrite. See [CLAUDE.md](./CLAUDE.md) for the full map and how to add content.
 src/
   engine/   pure sim: businesses, city/real-estate, production, finance (market/bonds/loans), save, offline
   store/    Svelte bridge: tick loop + reactive view snapshot
-  ui/       Work / City / Industry / Finance tabs; city renders as ASCII or a 3D isometric canvas
-  render/   renderer seam (the isometric city lands here later)
+  ui/       city-first UI: full-screen ASCII/isometric city + click-to-open popups (HQ, Town Hall, Realtor, Factory, Bank)
+  render/   Renderer interface seam (the iso renderer is ui/IsoCity.svelte)
   theme/    UI theme tiers unlocked as upgrades
 ```
 

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { view, buyRental, setActive } from '../store/game.svelte'
+  import { view, setActive, openMenu } from '../store/game.svelte'
   import type { CityCell } from '../store/game.svelte'
 
   let canvas: HTMLCanvasElement
@@ -9,14 +9,19 @@
 
   const TW = 52 // iso tile width
   const TH = 26 // iso tile height (2:1)
-  const H = 380 // canvas height
   const DENS = 'nAHM#@' // rental density glyphs -> taller buildings
+  const CIVIC_COLOR: Record<string, string> = {
+    townhall: '#5c7cfa',
+    realtor: '#15aabf',
+    hq: '#9c36b5',
+    factory: '#868e96',
+    bank: '#37b24d',
+  }
 
   let panX = 0
   let panY = 0
-  let selected = $state('Isometric view — drag to pan, click a building.')
+  let selected = $state('Click a building to manage it · drag to pan.')
 
-  // drag-to-pan (with a threshold so a drag isn't read as a click)
   let dragging = false
   let moved = false
   let startX = 0
@@ -28,22 +33,21 @@
     const n = parseInt(hex.slice(1), 16)
     return `rgb(${Math.round(((n >> 16) & 255) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`
   }
+  function box(base: string, h: number) {
+    return { top: base, left: darken(base, 0.78), right: darken(base, 0.6), h }
+  }
 
-  function building(cell: CityCell): { top: string; left: string; right: string; h: number } | null {
+  function building(cell: CityCell) {
     if (cell.kind === 'business') {
       const palette: Record<string, string> = { L: '#f6c945', C: '#9c6b4a', R: '#6d8aa6' }
-      const base = palette[cell.glyph] ?? '#5bb6a6'
-      return { top: base, left: darken(base, 0.78), right: darken(base, 0.6), h: 34 }
+      return box(palette[cell.glyph] ?? '#5bb6a6', 34)
     }
-    if (cell.kind === 'rental') {
-      const lvl = Math.max(0, DENS.indexOf(cell.glyph))
-      const base = '#e0796b'
-      return { top: base, left: darken(base, 0.78), right: darken(base, 0.6), h: 22 + lvl * 14 }
-    }
+    if (cell.kind === 'rental') return box('#e0796b', 22 + Math.max(0, DENS.indexOf(cell.glyph)) * 14)
+    if (cell.kind === 'civic') return box(CIVIC_COLOR[cell.civic ?? ''] ?? '#888', 48)
     return null
   }
 
-  function centerOf(W: number) {
+  function centerOf(W: number, Ht: number) {
     const cells = view.city.cells
     let minSX = Infinity
     let maxSX = -Infinity
@@ -59,7 +63,7 @@
     }
     return {
       cx: W / 2 - (minSX + maxSX) / 2 + panX,
-      cy: H / 2 - (minSY + maxSY) / 2 + panY - 30,
+      cy: Ht / 2 - (minSY + maxSY) / 2 + panY,
     }
   }
 
@@ -71,7 +75,6 @@
       [px - TW / 2, py - lift],
     ]
   }
-
   function poly(pts: [number, number][], fill: string, stroke: string) {
     if (!ctx) return
     ctx.beginPath()
@@ -88,7 +91,7 @@
   function drawGround(px: number, py: number, c: CityCell) {
     let fill = '#8ec06c'
     let stroke = '#74a857'
-    if (c.kind === 'business' || c.kind === 'rental') {
+    if (c.kind === 'business' || c.kind === 'rental' || c.kind === 'civic') {
       fill = '#cbc8bf'
       stroke = '#b1aea4'
     } else if (c.kind === 'forSale') {
@@ -97,8 +100,7 @@
     }
     poly(diamond(px, py), fill, stroke)
   }
-
-  function drawBuilding(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
+  function drawBox(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
     const g = diamond(px, py)
     const t = diamond(px, py, b.h)
     poly([g[3], g[2], t[2], t[3]], b.left, 'rgba(0,0,0,0.18)')
@@ -110,32 +112,45 @@
     if (!ctx || !canvas || !wrap) return
     const dpr = window.devicePixelRatio || 1
     const W = wrap.clientWidth
+    const Ht = wrap.clientHeight
     canvas.width = W * dpr
-    canvas.height = H * dpr
+    canvas.height = Ht * dpr
     canvas.style.width = W + 'px'
-    canvas.style.height = H + 'px'
+    canvas.style.height = Ht + 'px'
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    ctx.clearRect(0, 0, W, H)
+    ctx.clearRect(0, 0, W, Ht)
 
     const cells = view.city.cells
     if (cells.length === 0) return
     const sorted = [...cells].sort((a, b) => a.x + a.y - (b.x + b.y))
-    const { cx, cy } = centerOf(W)
+    const { cx, cy } = centerOf(W, Ht)
+    const sx = (c: CityCell) => cx + (c.x - c.y) * (TW / 2)
+    const sy = (c: CityCell) => cy + (c.x + c.y) * (TH / 2)
 
-    // ground first, then buildings (so near ground never covers a far tower)
-    for (const c of sorted) {
-      drawGround(cx + (c.x - c.y) * (TW / 2), cy + (c.x + c.y) * (TH / 2), c)
-    }
+    for (const c of sorted) drawGround(sx(c), sy(c), c)
     for (const c of sorted) {
       const b = building(c)
-      if (b) drawBuilding(cx + (c.x - c.y) * (TW / 2), cy + (c.x + c.y) * (TH / 2), b)
+      if (b) drawBox(sx(c), sy(c), b)
+    }
+    // civic labels float above their buildings
+    ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
+    ctx.textAlign = 'center'
+    for (const c of sorted) {
+      if (c.kind !== 'civic') continue
+      const lx = sx(c)
+      const ly = sy(c) - 48 - 9
+      const w = ctx.measureText(c.label).width
+      ctx.fillStyle = 'rgba(0,0,0,0.78)'
+      ctx.fillRect(lx - w / 2 - 4, ly - 9, w + 8, 14)
+      ctx.fillStyle = '#fff'
+      ctx.fillText(c.label, lx, ly + 1)
     }
   }
 
   function pick(clientX: number, clientY: number): CityCell | null {
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
-    const { cx, cy } = centerOf(wrap.clientWidth)
+    const { cx, cy } = centerOf(wrap.clientWidth, wrap.clientHeight)
     const u = clientX - rect.left - cx
     const v = clientY - rect.top - cy
     const tx = Math.round((u / (TW / 2) + v / (TH / 2)) / 2)
@@ -146,16 +161,11 @@
   function onTile(c: CityCell) {
     if (c.kind === 'business' && c.businessId) {
       setActive(c.businessId)
-      selected = `Now working here: ${c.label}`
-    } else if (c.kind === 'forSale') {
-      if (view.city.canBuyRental) {
-        buyRental()
-        selected = 'Bought a property — rent now rolls in.'
-      } else {
-        selected = `You need ${view.city.rentalCostText} to buy this lot.`
-      }
-    } else if (c.kind === 'rental') {
-      selected = `${c.label} — collecting rent.`
+      openMenu('ops')
+    } else if (c.kind === 'civic' && c.menu) {
+      openMenu(c.menu)
+    } else if (c.kind === 'rental' || c.kind === 'forSale') {
+      openMenu('realestate')
     }
   }
 
@@ -179,11 +189,13 @@
   function up(e: PointerEvent) {
     if (dragging && !moved) {
       const c = pick(e.clientX, e.clientY)
-      if (c) onTile(c)
+      if (c && c.kind !== 'empty') {
+        onTile(c)
+        selected = c.kind === 'civic' ? c.label : c.label || 'empty lot'
+      }
     }
     dragging = false
   }
-
   function recenter() {
     panX = 0
     panY = 0
@@ -198,7 +210,6 @@
     return () => ro.disconnect()
   })
 
-  // Redraw when the city structure changes (new buildings, density, etc.).
   $effect(() => {
     view.city.cells
     draw()
@@ -222,7 +233,7 @@
     ></canvas>
   </div>
   <div class="city-foot">
-    <span class="legend">yellow = shops · red = rentals (taller = denser) · gold = lot for sale</span>
+    <span class="legend">click the labelled buildings (Town Hall, Bank…) or your shops to manage them</span>
     <span class="selected">{selected}</span>
   </div>
 </div>

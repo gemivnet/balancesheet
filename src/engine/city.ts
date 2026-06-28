@@ -93,7 +93,29 @@ export function spiralPositions(n: number): Vec[] {
   return out
 }
 
-export type CellKind = 'empty' | 'forSale' | 'business' | 'rental'
+export type CellKind = 'empty' | 'forSale' | 'business' | 'rental' | 'civic'
+
+export type CivicId = 'townhall' | 'realtor' | 'hq' | 'factory' | 'bank'
+
+export interface CivicDef {
+  id: CivicId
+  name: string
+  menu: string
+  pos: Vec
+}
+
+/** Civic buildings: landmarks you click to open each system's popup. */
+export const CIVIC_DEFS: CivicDef[] = [
+  { id: 'townhall', name: 'TOWN HALL', menu: 'jobs', pos: { x: -4, y: -4 } },
+  { id: 'realtor', name: 'REALTOR', menu: 'realestate', pos: { x: -2, y: -4 } },
+  { id: 'hq', name: 'HQ', menu: 'hq', pos: { x: 0, y: -4 } },
+  { id: 'factory', name: 'FACTORY', menu: 'factory', pos: { x: 2, y: -4 } },
+  { id: 'bank', name: 'BANK', menu: 'bank', pos: { x: 4, y: -4 } },
+]
+
+export const CIVIC_BY_ID: Record<CivicId, CivicDef> = Object.fromEntries(
+  CIVIC_DEFS.map((c) => [c.id, c]),
+) as Record<CivicId, CivicDef>
 
 export interface PlacedCell {
   x: number
@@ -102,6 +124,7 @@ export interface PlacedCell {
   glyph: string
   label: string
   businessId?: string
+  civic?: CivicId
 }
 
 export interface CityLayout {
@@ -120,29 +143,41 @@ export interface LayoutInput {
 
 /** Place businesses (centre) + rentals (spiralling out) + the next for-sale lot. */
 export function layoutCity({ startedBusinesses, rentals, rentalGlyph }: LayoutInput): CityLayout {
-  const buildingCount = startedBusinesses.length + rentals
-  const positions = spiralPositions(buildingCount + 1) // +1 for the next for-sale lot
   const cells: PlacedCell[] = []
-  let i = 0
+  const occupied = new Set<string>()
 
+  // Civic buildings sit at fixed positions; the business/rental spiral skips them.
+  for (const c of CIVIC_DEFS) {
+    cells.push({ x: c.pos.x, y: c.pos.y, kind: 'civic', glyph: c.name[0], label: c.name, civic: c.id })
+    occupied.add(`${c.pos.x},${c.pos.y}`)
+  }
+
+  const need = startedBusinesses.length + rentals + 1 // +1 for the next for-sale lot
+  const free: Vec[] = []
+  for (const p of spiralPositions(need + CIVIC_DEFS.length + 8)) {
+    if (!occupied.has(`${p.x},${p.y}`)) free.push(p)
+    if (free.length >= need) break
+  }
+
+  let i = 0
   for (const b of startedBusinesses) {
-    const p = positions[i++]
+    const p = free[i++]
     cells.push({ x: p.x, y: p.y, kind: 'business', glyph: b.glyph, label: b.name, businessId: b.id })
   }
   for (let r = 0; r < rentals; r++) {
-    const p = positions[i++]
+    const p = free[i++]
     cells.push({ x: p.x, y: p.y, kind: 'rental', glyph: rentalGlyph, label: 'Rental property' })
   }
-  const lot = positions[i]
+  const lot = free[i]
   if (lot) cells.push({ x: lot.x, y: lot.y, kind: 'forSale', glyph: '$', label: 'Lot for sale' })
 
   const xs = cells.map((c) => c.x)
   const ys = cells.map((c) => c.y)
   return {
     cells,
-    minX: Math.min(0, ...xs) - 1,
-    maxX: Math.max(0, ...xs) + 1,
-    minY: Math.min(0, ...ys) - 1,
-    maxY: Math.max(0, ...ys) + 1,
+    minX: Math.min(...xs) - 1,
+    maxX: Math.max(...xs) + 1,
+    minY: Math.min(...ys) - 1,
+    maxY: Math.max(...ys) + 1,
   }
 }

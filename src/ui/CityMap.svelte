@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { view, buyRental, setActive } from '../store/game.svelte'
+  import { view, setActive, openMenu } from '../store/game.svelte'
   import type { CityCell } from '../store/game.svelte'
 
   let viewport: HTMLDivElement
@@ -38,17 +38,13 @@
     if (moved) return // it was a drag, not a click
     if (cell.kind === 'business' && cell.businessId) {
       setActive(cell.businessId)
-      selected = `Now working here: ${cell.label}`
-    } else if (cell.kind === 'forSale') {
-      if (view.city.canBuyRental) {
-        buyRental()
-        selected = 'Bought a property — rent now rolls in every second.'
-      } else {
-        selected = `You need ${view.city.rentalCostText} to buy this lot.`
-      }
-    } else if (cell.kind === 'rental') {
-      selected = `${cell.label} — collecting rent.`
+      openMenu('ops')
+    } else if (cell.kind === 'civic' && cell.menu) {
+      openMenu(cell.menu)
+    } else if (cell.kind === 'rental' || cell.kind === 'forSale') {
+      openMenu('realestate')
     }
+    selected = cell.label || 'empty lot'
   }
 
   function recenter() {
@@ -91,7 +87,7 @@
   </div>
 
   <div class="city-foot">
-    <span class="legend">letters = your shops · buildings = rentals · <b>$</b> = lot for sale</span>
+    <span class="legend">shops + civic buildings (T·R·H·F·B = Town Hall, Realtor, HQ, Factory, Bank) — click to manage</span>
     <span class="selected">{selected}</span>
   </div>
 </div>
