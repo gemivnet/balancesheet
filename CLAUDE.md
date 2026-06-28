@@ -88,9 +88,9 @@ listed before the factories that consume them so a chain flows within one tick.
 Costs and rates live entirely in `businesses.ts` / `upgrades.ts`. The cost curve is
 `baseCost × costGrowth^owned`; passive income is `revenue ÷ cycleTime`; offline is
 capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Real-estate prices, rent, and the
-city tiers live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`); factory recipes/costs in
-`facilities.ts`; contract sizing in `contracts.ts` (`RESOURCE_VALUE`). Tune there —
-no engine changes.
+city tiers + housing **density** live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`,
+`DENSITY_*`); factory recipes/costs in `facilities.ts`; resource sell + contract values
+in `resources.ts` (`RESOURCE_VALUE`). Tune there — no engine changes.
 
 ## Working on it
 

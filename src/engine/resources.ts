@@ -28,3 +28,12 @@ export function initialResources(): Record<ResourceId, Decimal> {
   for (const r of RESOURCE_DEFS) out[r.id] = D(0)
   return out
 }
+
+/** Cash value per unit — used for selling on the spot market and sizing contracts. */
+export const RESOURCE_VALUE: Record<ResourceId, number> = {
+  wood: 3,
+  ore: 4,
+  planks: 14,
+  metal: 20,
+  goods: 70,
+}

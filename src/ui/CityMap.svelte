@@ -77,7 +77,7 @@
     onpointerup={up}
     onpointerleave={up}
   >
-    <div class="city-grid" style="--cols:{view.city.cols}">
+    <div class="city-grid" class:grid-lines={view.cityGrid} style="--cols:{view.city.cols}">
       {#each view.city.cells as cell (cell.key)}
         {#if cell.kind === 'empty'}
           <span class="tile empty">{cell.glyph}</span>

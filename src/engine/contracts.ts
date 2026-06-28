@@ -3,18 +3,10 @@
 // better margin — the risk/reward choice. Contracts are saved (plain numbers), so
 // generation can use Math.random freely.
 
+import { RESOURCE_VALUE } from './resources'
 import type { Contract, ResourceId } from './types'
 
 export const CONTRACT_RESOURCES: ResourceId[] = ['wood', 'ore', 'planks', 'metal', 'goods']
-
-/** Rough cash value per unit, used to size rewards. */
-export const RESOURCE_VALUE: Record<ResourceId, number> = {
-  wood: 2,
-  ore: 3,
-  planks: 9,
-  metal: 13,
-  goods: 45,
-}
 
 export const MAX_AVAILABLE = 4
 export const MAX_ACTIVE = 4

@@ -634,3 +634,81 @@ button.tile.forSale {
 .c-sub button {
   font-size: 11px;
 }
+
+/* extra UI themes (bought as upgrades) */
+.theme-dark {
+  --bg: #0c0c0c;
+  --fg: #e6e6e6;
+  --muted: #8a8a8a;
+  --line: #555555;
+  --panel: #151515;
+  --disabled: #444444;
+  --shadow: none;
+  color-scheme: dark;
+}
+.theme-amber {
+  --bg: #181100;
+  --fg: #ffb000;
+  --muted: #a07400;
+  --line: #6b4d00;
+  --panel: #201700;
+  --disabled: #5a4000;
+  --shadow: none;
+  color-scheme: dark;
+}
+.theme-blue {
+  --bg: #0a1a2f;
+  --fg: #d2e4ff;
+  --muted: #6f8db0;
+  --line: #2f5688;
+  --panel: #0e2238;
+  --disabled: #34506f;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+/* city street gridlines (City Planner upgrade) */
+.city-grid.grid-lines .tile {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 22%, transparent);
+}
+
+/* sell buttons */
+.resource .r-sell {
+  font-size: 10px;
+  padding: 1px 5px;
+  margin-left: 2px;
+}
+
+/* real estate actions + rent upgrades */
+.re-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.re-actions .buy-prop {
+  width: auto;
+  flex: 1;
+  min-width: 160px;
+}
+.re-sub {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 4px 0 8px;
+}
+
+/* theme switcher chips */
+.savebar .themes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.theme-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+}
+.theme-chip.active {
+  background: var(--fg);
+  color: var(--bg);
+}

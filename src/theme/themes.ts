@@ -14,4 +14,7 @@ export interface ThemeMeta {
 export const THEMES: Record<ThemeId, ThemeMeta> = {
   mono: { id: 'mono', label: 'Monochrome', note: 'Black & white ASCII — where every tycoon starts.' },
   gray: { id: 'gray', label: 'Grayscale', note: 'A touch of gray. The empire is taking shape.' },
+  dark: { id: 'dark', label: 'Dark Terminal', note: 'White on black — classic CRT glow.' },
+  amber: { id: 'amber', label: 'Amber Monitor', note: 'Warm amber phosphor.' },
+  blue: { id: 'blue', label: 'Blueprint', note: 'Cool blueprint blues.' },
 }

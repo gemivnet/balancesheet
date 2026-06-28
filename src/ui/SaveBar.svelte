@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { downloadSave, importSave, resetGame } from '../store/game.svelte'
+  import { view, downloadSave, importSave, resetGame, setTheme } from '../store/game.svelte'
 
   let fileInput: HTMLInputElement
 
@@ -15,10 +15,23 @@
   function confirmReset() {
     if (confirm('Erase your game and start over? This cannot be undone.')) resetGame()
   }
+
+  const hasThemes = $derived(view.themes.some((t) => t.unlocked && t.id !== 'mono'))
 </script>
 
 <footer class="savebar">
   <span class="brand">ASCII TYCOON · saves to this browser</span>
+  {#if hasThemes}
+    <span class="themes">
+      {#each view.themes as t (t.id)}
+        {#if t.unlocked}
+          <button class="theme-chip" class:active={t.active} onclick={() => setTheme(t.id)}>
+            {t.label}
+          </button>
+        {/if}
+      {/each}
+    </span>
+  {/if}
   <span class="spacer"></span>
   <button onclick={downloadSave}>export save</button>
   <button onclick={() => fileInput.click()}>import save</button>

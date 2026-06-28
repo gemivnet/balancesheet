@@ -9,8 +9,16 @@ import Decimal from 'break_infinity.js'
 import { D } from './num'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from './businesses'
 import { UPGRADE_BY_ID } from './upgrades'
-import { REAL_ESTATE, cityTier } from './city'
+import {
+  REAL_ESTATE,
+  cityTier,
+  DENSITY_BASE_COST,
+  DENSITY_GROWTH,
+  DENSITY_RENT_FACTOR,
+  MAX_DENSITY,
+} from './city'
 import { FACILITY_DEFS, FACILITY_BY_ID } from './facilities'
+import { RESOURCE_VALUE } from './resources'
 import { generateContract, MAX_AVAILABLE, MAX_ACTIVE, CONTRACT_REFRESH } from './contracts'
 import type { BusinessId, Contract, GameState, Mults, ResourceId, UpgradeId } from './types'
 
@@ -21,6 +29,7 @@ export function computeMults(state: GameState): Mults {
   for (const f of FACILITY_DEFS) byFacility[f.id] = { output: D(1) }
   let global = D(1)
   let click = D(1)
+  let rent = D(1)
   for (const id in state.upgrades) {
     const u = UPGRADE_BY_ID[id]
     if (!u) continue
@@ -37,6 +46,9 @@ export function computeMults(state: GameState): Mults {
       case 'globalRevenue':
         global = global.mul(u.factor)
         break
+      case 'propertyRent':
+        rent = rent.mul(u.factor)
+        break
       case 'clickPower':
         click = click.mul(u.factor)
         break
@@ -44,7 +56,7 @@ export function computeMults(state: GameState): Mults {
         break
     }
   }
-  return { global, click, byBusiness, byFacility }
+  return { global, click, byBusiness, byFacility, rent }
 }
 
 export class Engine {
@@ -178,7 +190,32 @@ export class Engine {
   /** Passive rent per second across all properties (scaled by city tier). */
   rentPerSec(): Decimal {
     const tier = cityTier(this.totalBuildings())
-    return REAL_ESTATE.baseRent.mul(this.state.rentals).mul(tier.rentMult)
+    return REAL_ESTATE.baseRent
+      .mul(this.state.rentals)
+      .mul(tier.rentMult)
+      .mul(this.densityMult())
+      .mul(this.mults.rent)
+  }
+
+  densityMult(): number {
+    return Math.pow(DENSITY_RENT_FACTOR, this.state.densityLevel)
+  }
+
+  densityCost(): Decimal {
+    return DENSITY_BASE_COST.mul(new Decimal(DENSITY_GROWTH).pow(this.state.densityLevel))
+  }
+
+  atMaxDensity(): boolean {
+    return this.state.densityLevel >= MAX_DENSITY
+  }
+
+  buyDensity(): boolean {
+    if (this.atMaxDensity()) return false
+    const cost = this.densityCost()
+    if (this.state.cash.lt(cost)) return false
+    this.state.cash = this.state.cash.sub(cost)
+    this.state.densityLevel++
+    return true
   }
 
   buyRental(): boolean {
@@ -241,6 +278,19 @@ export class Engine {
       }
     }
     return rate
+  }
+
+  /** Sell the entire stock of a resource on the spot market at its base value. */
+  sellResource(resource: ResourceId): boolean {
+    const stock = this.state.resources[resource]
+    if (stock.lte(0)) return false
+    this.earn(stock.mul(RESOURCE_VALUE[resource]))
+    this.state.resources[resource] = D(0)
+    return true
+  }
+
+  resourceValue(resource: ResourceId): number {
+    return RESOURCE_VALUE[resource]
   }
 
   private tickProduction(dt: number): void {
@@ -334,6 +384,7 @@ export class Engine {
       const fs = this.state.facilities[u.requiresFacility.facility]
       if (!fs || fs.owned < u.requiresFacility.owned) return false
     }
+    if (u.requiresRentals != null && this.state.rentals < u.requiresRentals) return false
     return true
   }
 
@@ -347,6 +398,7 @@ export class Engine {
     if (u.kind === 'ui' && u.ui) {
       if (u.ui.type === 'abbreviate') this.state.ui.abbreviate = true
       else if (u.ui.type === 'theme') this.state.ui.theme = u.ui.theme
+      else if (u.ui.type === 'flag') this.state.ui[u.ui.flag] = true
     }
     this.recompute()
     return true

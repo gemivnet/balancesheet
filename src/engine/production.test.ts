@@ -13,15 +13,15 @@ function newEngine(cash = 0): Engine {
 describe('facilities', () => {
   it('cost grows geometrically and buying deducts cash', () => {
     const e = newEngine(10000)
-    expect(e.facilityCost('logging', 1).toNumber()).toBeCloseTo(1000, 6)
+    expect(e.facilityCost('logging', 1).toNumber()).toBeCloseTo(150, 6)
     expect(e.buyFacility('logging', 1)).toBe(true)
     expect(e.state.facilities.logging.owned).toBe(1)
-    expect(e.facilityCost('logging', 1).toNumber()).toBeCloseTo(1120, 6) // 1000 * 1.12
+    expect(e.facilityCost('logging', 1).toNumber()).toBeCloseTo(168, 6) // 150 * 1.12
   })
 
   it('unlocks by lifetime earnings', () => {
     const e = newEngine()
-    expect(e.facilityUnlocked('logging')).toBe(false) // needs 500 lifetime
+    expect(e.facilityUnlocked('logging')).toBe(false) // needs 120 lifetime
     e.state.lifetimeEarnings = D(500)
     expect(e.facilityUnlocked('logging')).toBe(true)
   })

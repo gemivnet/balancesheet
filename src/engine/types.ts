@@ -27,11 +27,17 @@ export type UpgradeKind =
   | 'clickPower' // multiply manual click yield (global)
   | 'globalRevenue' // multiply all revenue
   | 'facilityOutput' // multiply one facility's output (machines)
+  | 'propertyRent' // multiply rental income
   | 'ui' // unlock a UI / quality-of-life tier (no economic effect)
 
-export type ThemeId = 'mono' | 'gray' // future tiers: 'color', 'iso'
+export type ThemeId = 'mono' | 'gray' | 'dark' | 'amber' | 'blue'
 
-export type UiEffect = { type: 'abbreviate' } | { type: 'theme'; theme: ThemeId }
+export type UiFlag = 'cityGrid'
+
+export type UiEffect =
+  | { type: 'abbreviate' }
+  | { type: 'theme'; theme: ThemeId }
+  | { type: 'flag'; flag: UiFlag }
 
 /** Static definition of a one-time upgrade purchase. */
 export interface UpgradeDef {
@@ -45,6 +51,7 @@ export interface UpgradeDef {
   ui?: UiEffect // for kind 'ui'
   requires?: { business: BusinessId; owned: number } // visibility gate
   requiresFacility?: { facility: string; owned: number }
+  requiresRentals?: number
 }
 
 /** Mutable, saved per-business state. */
@@ -100,9 +107,10 @@ export interface GameState {
   activeBusinessId: BusinessId // which business "you" are personally working
   businesses: Record<BusinessId, BusinessState>
   upgrades: Record<UpgradeId, true> // purchased upgrade ids
-  ui: { abbreviate: boolean; theme: ThemeId }
+  ui: { abbreviate: boolean; theme: ThemeId; cityGrid: boolean }
   stats: { totalClicks: number }
   rentals: number // rental properties owned (real estate)
+  densityLevel: number // housing density tier (boosts rent, denser buildings)
   resources: Record<ResourceId, Decimal>
   facilities: Record<string, FacilityState>
   contracts: ContractBoard
@@ -115,4 +123,5 @@ export interface Mults {
   click: Decimal
   byBusiness: Record<BusinessId, { revenue: Decimal; speed: number }>
   byFacility: Record<string, { output: Decimal }>
+  rent: Decimal
 }

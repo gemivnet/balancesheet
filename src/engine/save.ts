@@ -20,9 +20,10 @@ interface SavedShape {
   activeBusinessId: string
   businesses: Record<string, { owned: number; managed: boolean; progress: number }>
   upgrades: Record<string, true>
-  ui: { abbreviate: boolean; theme: string }
+  ui: { abbreviate: boolean; theme: string; cityGrid: boolean }
   stats: { totalClicks: number }
   rentals: number
+  densityLevel: number
   resources: Record<string, string>
   facilities: Record<string, number>
   contracts: ContractBoard
@@ -42,9 +43,10 @@ export function serialize(state: GameState): string {
       ]),
     ),
     upgrades: { ...state.upgrades },
-    ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme },
+    ui: { abbreviate: state.ui.abbreviate, theme: state.ui.theme, cityGrid: state.ui.cityGrid },
     stats: { totalClicks: state.stats.totalClicks },
     rentals: state.rentals,
+    densityLevel: state.densityLevel,
     resources: Object.fromEntries(Object.entries(state.resources).map(([k, v]) => [k, v.toString()])),
     facilities: Object.fromEntries(Object.entries(state.facilities).map(([k, v]) => [k, v.owned])),
     contracts: state.contracts,
@@ -62,12 +64,13 @@ export function deserialize(raw: string): GameState {
   if (data.upgrades) state.upgrades = { ...data.upgrades }
   if (data.ui) {
     state.ui.abbreviate = !!data.ui.abbreviate
-    if (data.ui.theme === 'gray' || data.ui.theme === 'mono') {
-      state.ui.theme = data.ui.theme as ThemeId
-    }
+    state.ui.cityGrid = !!data.ui.cityGrid
+    const themes: ThemeId[] = ['mono', 'gray', 'dark', 'amber', 'blue']
+    if (themes.includes(data.ui.theme as ThemeId)) state.ui.theme = data.ui.theme as ThemeId
   }
   if (data.stats) state.stats.totalClicks = data.stats.totalClicks ?? 0
   if (typeof data.rentals === 'number') state.rentals = data.rentals
+  if (typeof data.densityLevel === 'number') state.densityLevel = data.densityLevel
   if (data.resources) {
     for (const r of RESOURCE_DEFS) {
       const v = data.resources[r.id]

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { view } from '../store/game.svelte'
+  import { view, sellResource } from '../store/game.svelte'
 </script>
 
 <div class="panel">
@@ -11,6 +11,14 @@
         <span class="r-name">{r.name}</span>
         <span class="r-amt">{r.amountText}</span>
         <span class="r-rate">{r.rateText}</span>
+        <button
+          class="r-sell"
+          onclick={() => sellResource(r.id)}
+          disabled={!r.canSell}
+          title="Sell your whole stock at {r.sellValueText} each"
+        >
+          sell @ {r.sellValueText}
+        </button>
       </div>
     {/each}
   </div>

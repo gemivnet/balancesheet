@@ -12,15 +12,25 @@ import { applyOffline, MAX_OFFLINE_SECONDS } from '../engine/offline'
 import { BUSINESS_DEFS, BUSINESS_BY_ID } from '../engine/businesses'
 import { UPGRADE_DEFS } from '../engine/upgrades'
 import { D, formatMoney, formatRate, formatInt, formatQty } from '../engine/num'
-import { layoutCity, cityTier } from '../engine/city'
+import { layoutCity, cityTier, densityGlyph, densityName } from '../engine/city'
 import { FACILITY_DEFS } from '../engine/facilities'
 import { RESOURCE_DEFS, RESOURCE_BY_ID } from '../engine/resources'
 import { MAX_ACTIVE } from '../engine/contracts'
+import { THEMES } from '../theme/themes'
 import type { CellKind, PlacedCell } from '../engine/city'
-import type { ThemeId } from '../engine/types'
+import type { ResourceId, ThemeId } from '../engine/types'
 
 let engine = new Engine(load() ?? initialState())
 let lastCitySig = ''
+
+const THEME_ORDER: ThemeId[] = ['mono', 'gray', 'dark', 'amber', 'blue']
+const THEME_UNLOCK: Record<ThemeId, string | null> = {
+  mono: null,
+  gray: 'ui_gray',
+  dark: 'ui_dark',
+  amber: 'ui_amber',
+  blue: 'ui_blue',
+}
 
 export interface BusinessRow {
   id: string
@@ -68,6 +78,15 @@ export interface ResourceRow {
   glyph: string
   amountText: string
   rateText: string
+  sellValueText: string
+  canSell: boolean
+}
+
+export interface ThemeRow {
+  id: string
+  label: string
+  unlocked: boolean
+  active: boolean
 }
 
 export interface FacilityRow {
@@ -112,6 +131,8 @@ export const view = $state({
   clicks: 0,
   abbreviate: false,
   theme: 'mono' as ThemeId,
+  cityGrid: false,
+  themes: [] as ThemeRow[],
   activeName: '',
   businesses: [] as BusinessRow[],
   upgrades: [] as UpgradeRow[],
@@ -123,6 +144,11 @@ export const view = $state({
     rentText: '$0.00/s',
     rentalCostText: '$0.00',
     canBuyRental: false,
+    densityName: 'Low-density',
+    densityCostText: '$0.00',
+    canBuyDensity: false,
+    atMaxDensity: false,
+    rentUpgrades: [] as UpgradeRow[],
     cols: 1,
     cells: [] as CityCell[],
   },
@@ -140,6 +166,13 @@ function snapshot(): void {
   const ab = s.ui.abbreviate
   view.abbreviate = ab
   view.theme = s.ui.theme
+  view.cityGrid = s.ui.cityGrid
+  view.themes = THEME_ORDER.map((id): ThemeRow => ({
+    id,
+    label: THEMES[id].label,
+    unlocked: THEME_UNLOCK[id] === null || !!s.upgrades[THEME_UNLOCK[id] as string],
+    active: s.ui.theme === id,
+  }))
   view.cashText = formatMoney(s.cash, ab)
   view.incomeText = formatRate(engine.totalIncomePerSec(), ab)
   view.lifetimeText = formatMoney(s.lifetimeEarnings, ab)
@@ -177,7 +210,11 @@ function snapshot(): void {
   })
 
   view.upgrades = UPGRADE_DEFS.filter(
-    (u) => u.kind !== 'facilityOutput' && engine.upgradeVisible(u.id) && !s.upgrades[u.id],
+    (u) =>
+      u.kind !== 'facilityOutput' &&
+      u.kind !== 'propertyRent' &&
+      engine.upgradeVisible(u.id) &&
+      !s.upgrades[u.id],
   ).map(
     (u): UpgradeRow => ({
       id: u.id,
@@ -200,15 +237,31 @@ function snapshot(): void {
   view.city.rentalCostText = formatMoney(rentalCost, ab)
   view.city.canBuyRental = s.cash.gte(rentalCost)
 
+  const densityCost = engine.densityCost()
+  view.city.densityName = densityName(s.densityLevel)
+  view.city.densityCostText = formatMoney(densityCost, ab)
+  view.city.atMaxDensity = engine.atMaxDensity()
+  view.city.canBuyDensity = !engine.atMaxDensity() && s.cash.gte(densityCost)
+  view.city.rentUpgrades = UPGRADE_DEFS.filter(
+    (u) => u.kind === 'propertyRent' && engine.upgradeVisible(u.id) && !s.upgrades[u.id],
+  ).map((u): UpgradeRow => ({
+    id: u.id,
+    name: u.name,
+    desc: u.desc,
+    cost: formatMoney(u.cost, ab),
+    canBuy: s.cash.gte(u.cost),
+    kind: u.kind,
+  }))
+
   // Rebuild the (clickable) grid only when its structure actually changes.
   const started = BUSINESS_DEFS.filter((b) => s.businesses[b.id].owned > 0)
-  const sig = `${started.map((b) => b.id).join(',')}|${s.rentals}|${tier.index}`
+  const sig = `${started.map((b) => b.id).join(',')}|${s.rentals}|${tier.index}|${s.densityLevel}`
   if (sig !== lastCitySig) {
     lastCitySig = sig
     const layout = layoutCity({
       startedBusinesses: started.map((b) => ({ id: b.id, glyph: b.glyph, name: b.name })),
       rentals: s.rentals,
-      tier,
+      rentalGlyph: densityGlyph(s.densityLevel),
     })
     const byPos = new Map<string, PlacedCell>()
     for (const c of layout.cells) byPos.set(`${c.x},${c.y}`, c)
@@ -237,6 +290,8 @@ function snapshot(): void {
       glyph: r.glyph,
       amountText: formatQty(s.resources[r.id], ab),
       rateText: (rate.gt(0) ? '+' : '') + formatQty(rate, ab) + '/s',
+      sellValueText: formatMoney(D(engine.resourceValue(r.id)), ab),
+      canSell: s.resources[r.id].gt(0),
     }
   })
 
@@ -341,6 +396,25 @@ export function setActive(id: string): void {
 export function buyRental(): void {
   engine.buyRental()
   snapshot()
+}
+
+export function buyDensity(): void {
+  engine.buyDensity()
+  snapshot()
+}
+
+export function sellResource(id: string): void {
+  engine.sellResource(id as ResourceId)
+  snapshot()
+}
+
+export function setTheme(id: string): void {
+  const t = id as ThemeId
+  const unlock = THEME_UNLOCK[t]
+  if (unlock === null || engine.state.upgrades[unlock]) {
+    engine.state.ui.theme = t
+    snapshot()
+  }
 }
 
 export function buildFacility(id: string): void {

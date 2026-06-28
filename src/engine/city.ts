@@ -43,6 +43,23 @@ export function cityTier(totalBuildings: number): CityTier {
   return tier
 }
 
+// --- housing density (SimCity-style): upgrade your blocks to denser buildings ---
+
+export const DENSITY_BASE_COST = D(2000)
+export const DENSITY_GROWTH = 3.2
+export const DENSITY_RENT_FACTOR = 1.6
+const DENSITY_GLYPHS = ['n', 'A', 'H', 'M', '#', '@']
+const DENSITY_NAMES = ['Low-density', 'Townhouses', 'Apartments', 'Towers', 'High-rises', 'Arcology']
+export const MAX_DENSITY = DENSITY_GLYPHS.length - 1
+
+export function densityGlyph(level: number): string {
+  return DENSITY_GLYPHS[Math.min(Math.max(level, 0), MAX_DENSITY)]
+}
+
+export function densityName(level: number): string {
+  return DENSITY_NAMES[Math.min(Math.max(level, 0), MAX_DENSITY)]
+}
+
 export interface Vec {
   x: number
   y: number
@@ -98,11 +115,11 @@ export interface CityLayout {
 export interface LayoutInput {
   startedBusinesses: { id: string; glyph: string; name: string }[]
   rentals: number
-  tier: CityTier
+  rentalGlyph: string
 }
 
 /** Place businesses (centre) + rentals (spiralling out) + the next for-sale lot. */
-export function layoutCity({ startedBusinesses, rentals, tier }: LayoutInput): CityLayout {
+export function layoutCity({ startedBusinesses, rentals, rentalGlyph }: LayoutInput): CityLayout {
   const buildingCount = startedBusinesses.length + rentals
   const positions = spiralPositions(buildingCount + 1) // +1 for the next for-sale lot
   const cells: PlacedCell[] = []
@@ -114,7 +131,7 @@ export function layoutCity({ startedBusinesses, rentals, tier }: LayoutInput): C
   }
   for (let r = 0; r < rentals; r++) {
     const p = positions[i++]
-    cells.push({ x: p.x, y: p.y, kind: 'rental', glyph: tier.rentalGlyph, label: 'Rental property' })
+    cells.push({ x: p.x, y: p.y, kind: 'rental', glyph: rentalGlyph, label: 'Rental property' })
   }
   const lot = positions[i]
   if (lot) cells.push({ x: lot.x, y: lot.y, kind: 'forSale', glyph: '$', label: 'Lot for sale' })

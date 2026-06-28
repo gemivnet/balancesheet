@@ -38,7 +38,7 @@ describe('layoutCity', () => {
     const layout = layoutCity({
       startedBusinesses: [{ id: 'lemonade', glyph: 'L', name: 'Lemonade Stand' }],
       rentals: 1,
-      tier: cityTier(2),
+      rentalGlyph: 'n',
     })
     expect(layout.cells).toHaveLength(3)
     expect(layout.cells[0]).toMatchObject({ x: 0, y: 0, kind: 'business', businessId: 'lemonade' })

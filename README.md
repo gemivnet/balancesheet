@@ -9,9 +9,9 @@ automate them, then watch the money pile up while you're away. Grounded economic
 now; a scrollable city map, factories, and a finance market (stocks, bonds, FX,
 loans) are on the roadmap.
 
-> **Status: playable** — clicking → idle income, businesses & a deep upgrade list, a
-> scrollable city you build up through real estate, a production chain (factories,
-> machines, contracts), plus save + offline earnings and the first UI-upgrade tier.
+> **Status: playable** — clicking → idle income, businesses & deep upgrade trees, a
+> scrollable city with real estate + housing density, a production chain (factories,
+> machines, contracts, a sell market), save + offline earnings, and unlockable UI themes.
 
 ## Run it
 
@@ -40,12 +40,12 @@ or move it between machines.
 3. **Hire a manager** to automate it — now it earns while you're idle.
 4. Spend in the **UPGRADES** shop: ×2 revenue, faster cycles, stronger clicks…
    plus **UI upgrades** that literally improve the interface.
-5. Build your **city**: your shops anchor the centre — buy **property** (the Real
-   Estate panel, or click a pulsing `$` lot on the map) to collect rent and grow
-   from a Hamlet into a Metropolis.
+5. Build your **city**: buy **property** (Real Estate panel, or click a pulsing `$`
+   lot) for rent, then **raise density** to redevelop your blocks into taller
+   buildings — growing from a Hamlet into a Metropolis.
 6. Open the **Industry** tab: build **factories** to turn raw materials into goods,
-   add **machines** to boost output, and accept **contracts** to deliver goods for
-   cash before the deadline.
+   add **machines** to boost output, **sell** surplus on the spot market, and accept
+   **contracts** to deliver goods for cash before the deadline.
 7. Close the tab and come back later for **offline earnings**.
 
 Clicking is always useful — it instantly completes a work-cycle on top of any
