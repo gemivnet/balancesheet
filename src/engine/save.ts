@@ -9,7 +9,8 @@ import { BUSINESS_DEFS } from './businesses'
 import { RESOURCE_DEFS } from './resources'
 import { FACILITY_DEFS } from './facilities'
 import { FIRST_OFFER_DELAY } from './contracts'
-import type { ContractBoard, GameState, ThemeId } from './types'
+import { INSTRUMENT_DEFS } from './market'
+import type { Bond, ContractBoard, GameState, ThemeId } from './types'
 
 const SAVE_KEY = 'ascii-tycoon-save'
 
@@ -27,6 +28,14 @@ interface SavedShape {
   resources: Record<string, string>
   facilities: Record<string, number>
   contracts: ContractBoard
+  finance: {
+    savings: string
+    debt: string
+    bonds: Bond[]
+    nextBondId: number
+    holdings: Record<string, number>
+    prices: Record<string, number>
+  }
   lastSaved: number
 }
 
@@ -50,6 +59,14 @@ export function serialize(state: GameState): string {
     resources: Object.fromEntries(Object.entries(state.resources).map(([k, v]) => [k, v.toString()])),
     facilities: Object.fromEntries(Object.entries(state.facilities).map(([k, v]) => [k, v.owned])),
     contracts: state.contracts,
+    finance: {
+      savings: state.finance.savings.toString(),
+      debt: state.finance.debt.toString(),
+      bonds: state.finance.bonds,
+      nextBondId: state.finance.nextBondId,
+      holdings: state.finance.holdings,
+      prices: state.finance.prices,
+    },
     lastSaved: state.lastSaved,
   }
   return JSON.stringify(shape)
@@ -95,6 +112,26 @@ export function deserialize(raw: string): GameState {
       refreshTimer: data.contracts.refreshTimer ?? FIRST_OFFER_DELAY,
     }
   }
+  if (data.finance) {
+    const fin = state.finance
+    if (data.finance.savings != null) fin.savings = D(data.finance.savings)
+    if (data.finance.debt != null) fin.debt = D(data.finance.debt)
+    if (Array.isArray(data.finance.bonds)) fin.bonds = data.finance.bonds
+    if (typeof data.finance.nextBondId === 'number') fin.nextBondId = data.finance.nextBondId
+    if (data.finance.holdings) {
+      for (const inst of INSTRUMENT_DEFS) {
+        const h = data.finance.holdings[inst.id]
+        if (typeof h === 'number') fin.holdings[inst.id] = h
+      }
+    }
+    if (data.finance.prices) {
+      for (const inst of INSTRUMENT_DEFS) {
+        const p = data.finance.prices[inst.id]
+        if (typeof p === 'number' && isFinite(p) && p > 0) fin.prices[inst.id] = p
+      }
+    }
+  }
+
   if (data.lastSaved != null) state.lastSaved = data.lastSaved
 
   // Merge saved business state onto defaults so newly-added businesses default in.

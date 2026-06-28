@@ -37,6 +37,8 @@ src/
     resources.ts    material definitions (wood, ore, planks, metal, goods)
     facilities.ts   << add a factory/extractor here (data only)
     contracts.ts    contract generation + resource values
+    market.ts       tradeable instruments (stocks/fx) + price simulation
+    finance.ts      savings/loan rates + bond products
     save.ts         serialize/deserialize + localStorage wrappers
     offline.ts      "while you were away" earnings
     *.test.ts       Vitest unit tests
@@ -90,7 +92,9 @@ Costs and rates live entirely in `businesses.ts` / `upgrades.ts`. The cost curve
 capped in `offline.ts` (`MAX_OFFLINE_SECONDS`). Real-estate prices, rent, and the
 city tiers + housing **density** live in `city.ts` (`REAL_ESTATE`, `CITY_TIERS`,
 `DENSITY_*`); factory recipes/costs in `facilities.ts`; resource sell + contract values
-in `resources.ts` (`RESOURCE_VALUE`). Tune there — no engine changes.
+in `resources.ts` (`RESOURCE_VALUE`); finance rates/products in `finance.ts`
+(`SAVINGS_APR`, `LOAN_APR`, `GAME_YEAR`, `BOND_PRODUCTS`) and instruments in `market.ts`.
+Tune there — no engine changes.
 
 ## Working on it
 
@@ -106,7 +110,7 @@ in `resources.ts` (`RESOURCE_VALUE`). Tune there — no engine changes.
    `ui/CityMap.svelte`; buy property for rent, Hamlet → Metropolis.
 2. ✅ **Production** — `facilities.ts` + `contracts.ts`; raw materials → factories →
    goods → contracts you choose, in the Industry tab.
-3. **Finance** — `engine/economy/`: checking/savings, bonds, a simulated stock
-   market, FX, and loans/leverage; charts in the UI.
+3. ✅ **Finance** — `market.ts` + `finance.ts`: savings, loans, bonds, and a live
+   stock/FX market (prices move online only). UI in the Finance tab.
 4. **Isometric UI** — a canvas `Renderer` in `render/iso/` sold to the player as
    the ultimate "UI upgrade", with sprites and walking characters.

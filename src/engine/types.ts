@@ -99,6 +99,48 @@ export interface ContractBoard {
   refreshTimer: number
 }
 
+// --- finance layer ---
+
+export type InstrumentKind = 'stock' | 'fx'
+
+/** A tradeable instrument whose price random-walks over time. */
+export interface InstrumentDef {
+  id: string
+  name: string
+  ticker: string
+  kind: InstrumentKind
+  start: number
+  drift: number // per-second
+  vol: number // per-second volatility
+  min: number // price floor
+}
+
+export interface BondProductDef {
+  id: string
+  name: string
+  principal: number // cost now (face value)
+  yield: number // total return fraction at maturity
+  term: number // seconds to maturity
+}
+
+export interface Bond {
+  id: number
+  productId: string
+  principal: number
+  payout: number
+  remaining: number
+}
+
+export interface FinanceState {
+  savings: Decimal
+  debt: Decimal
+  bonds: Bond[]
+  nextBondId: number
+  holdings: Record<string, number> // instrumentId -> shares/units
+  prices: Record<string, number> // instrumentId -> current price
+  history: Record<string, number[]> // recent prices for sparklines (runtime-only, not saved)
+}
+
 /** The full mutable game state. This is what gets saved/loaded. */
 export interface GameState {
   version: number
@@ -114,6 +156,7 @@ export interface GameState {
   resources: Record<ResourceId, Decimal>
   facilities: Record<string, FacilityState>
   contracts: ContractBoard
+  finance: FinanceState
   lastSaved: number // epoch ms — used to compute offline progress
 }
 

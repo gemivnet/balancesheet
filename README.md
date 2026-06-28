@@ -10,8 +10,9 @@ now; a scrollable city map, factories, and a finance market (stocks, bonds, FX,
 loans) are on the roadmap.
 
 > **Status: playable** — clicking → idle income, businesses & deep upgrade trees, a
-> scrollable city with real estate + housing density, a production chain (factories,
-> machines, contracts, a sell market), save + offline earnings, and unlockable UI themes.
+> scrollable city with real estate + density, a production chain (factories, machines,
+> contracts, a sell market), a finance market (savings, loans, bonds, stocks, FX), plus
+> save + offline earnings and unlockable UI themes.
 
 ## Run it
 
@@ -46,7 +47,10 @@ or move it between machines.
 6. Open the **Industry** tab: build **factories** to turn raw materials into goods,
    add **machines** to boost output, **sell** surplus on the spot market, and accept
    **contracts** to deliver goods for cash before the deadline.
-7. Close the tab and come back later for **offline earnings**.
+7. Once you've earned enough, a **Finance** tab unlocks: park cash in **savings**,
+   take a **loan** to expand faster, buy **bonds**, and trade the **stock & FX**
+   markets (prices move live while you play).
+8. Close the tab and come back later for **offline earnings**.
 
 Clicking is always useful — it instantly completes a work-cycle on top of any
 idle income, so there's never any downtime.
@@ -61,9 +65,9 @@ rewrite. See [CLAUDE.md](./CLAUDE.md) for the full map and how to add content.
 
 ```
 src/
-  engine/   pure sim: businesses, city/real-estate, production (factories/contracts), save, offline
+  engine/   pure sim: businesses, city/real-estate, production, finance (market/bonds/loans), save, offline
   store/    Svelte bridge: tick loop + reactive view snapshot
-  ui/       ASCII components, organised into Work / City / Industry tabs (sticky HUD)
+  ui/       ASCII components, organised into Work / City / Industry / Finance tabs (sticky HUD)
   render/   renderer seam (the isometric city lands here later)
   theme/    UI theme tiers unlocked as upgrades
 ```
@@ -71,10 +75,9 @@ src/
 ## Roadmap
 
 - **Done** — clicker → idle, businesses & upgrades, a scrollable ASCII city with a
-  real-estate agency (Hamlet → Metropolis), and a production chain: factories,
-  machines, and contracts you choose.
-- **Next** — a finance market (savings, bonds, stocks, FX, loans).
-- **Then** — the isometric "Habbo" UI as the ultimate UI upgrade.
+  real-estate agency + housing density, a production chain (factories, machines,
+  contracts, a sell market), and a finance market (savings, loans, bonds, stocks, FX).
+- **Next** — the isometric "Habbo" UI as the ultimate UI upgrade.
 
 ## License
 

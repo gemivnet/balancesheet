@@ -712,3 +712,148 @@ button.tile.forSale {
   background: var(--fg);
   color: var(--bg);
 }
+
+/* finance */
+.fin-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fin-header h2 {
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.net-worth {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.nw-val {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.account {
+  border: 1px solid var(--line);
+  padding: 8px;
+  margin-bottom: 10px;
+}
+.acct-head {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+.acct-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 3px 0 6px;
+}
+.acct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.acct-actions button {
+  font-size: 12px;
+}
+
+.bond-products,
+.bond-held {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bond-held {
+  margin-top: 8px;
+}
+.bond-product {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+.bp-main {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+.bp-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.bp-sub button {
+  font-size: 11px;
+}
+.bond-h {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.bh-time {
+  color: var(--muted);
+}
+
+.instruments {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.instrument {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+}
+.inst-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.inst-ticker {
+  font-weight: 700;
+  flex: 1;
+}
+.inst-price {
+  font-weight: 700;
+}
+.inst-change {
+  font-size: 11px;
+  color: #2ea043;
+}
+.inst-change.down {
+  color: #f85149;
+}
+.inst-spark {
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 1px;
+  margin: 3px 0;
+  min-height: 14px;
+}
+.inst-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.inst-btns {
+  display: flex;
+  gap: 4px;
+}
+.inst-btns button {
+  font-size: 11px;
+}

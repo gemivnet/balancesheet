@@ -20,6 +20,8 @@ import {
 import { FACILITY_DEFS, FACILITY_BY_ID } from './facilities'
 import { RESOURCE_VALUE } from './resources'
 import { generateContract, MAX_AVAILABLE, MAX_ACTIVE, CONTRACT_REFRESH } from './contracts'
+import { INSTRUMENT_DEFS, nextPrice, MARKET_SAMPLE, HISTORY_LEN } from './market'
+import { GAME_YEAR, SAVINGS_APR, LOAN_APR, BOND_BY_ID, FINANCE_UNLOCK } from './finance'
 import type { BusinessId, Contract, GameState, Mults, ResourceId, UpgradeId } from './types'
 
 export function computeMults(state: GameState): Mults {
@@ -62,6 +64,7 @@ export function computeMults(state: GameState): Mults {
 export class Engine {
   state: GameState
   mults: Mults
+  marketSampleAcc = 0
 
   constructor(state: GameState) {
     this.state = state
@@ -127,6 +130,7 @@ export class Engine {
     if (rent.gt(0)) this.earn(rent.mul(dt))
 
     this.tickProduction(dt)
+    this.tickFinance(dt)
   }
 
   /** Cost to buy `count` more units of a business (geometric series). */
@@ -370,6 +374,152 @@ export class Engine {
         board.available.push(generateContract(board.nextId++))
       }
       board.refreshTimer = CONTRACT_REFRESH
+    }
+  }
+
+  // --- finance: savings, loans, bonds, market ----------------------------
+
+  financeUnlocked(): boolean {
+    return this.state.lifetimeEarnings.gte(FINANCE_UNLOCK)
+  }
+
+  /** Add cash without counting as "earnings" (withdrawals, sells, bond payouts…). */
+  private credit(amount: Decimal): void {
+    this.state.cash = this.state.cash.add(amount)
+  }
+
+  depositSavings(amount: Decimal | number): boolean {
+    let amt = D(amount)
+    if (amt.gt(this.state.cash)) amt = this.state.cash
+    if (amt.lte(0)) return false
+    this.state.cash = this.state.cash.sub(amt)
+    this.state.finance.savings = this.state.finance.savings.add(amt)
+    return true
+  }
+
+  withdrawSavings(amount: Decimal | number): boolean {
+    let amt = D(amount)
+    if (amt.gt(this.state.finance.savings)) amt = this.state.finance.savings
+    if (amt.lte(0)) return false
+    this.state.finance.savings = this.state.finance.savings.sub(amt)
+    this.credit(amt)
+    return true
+  }
+
+  holdingsValue(): Decimal {
+    const f = this.state.finance
+    let v = D(0)
+    for (const inst of INSTRUMENT_DEFS) {
+      const sh = f.holdings[inst.id] ?? 0
+      if (sh > 0) v = v.add(D(f.prices[inst.id]).mul(sh))
+    }
+    return v
+  }
+
+  netWorth(): Decimal {
+    const f = this.state.finance
+    let nw = this.state.cash.add(f.savings).sub(f.debt).add(this.holdingsValue())
+    for (const b of f.bonds) nw = nw.add(b.principal)
+    return nw
+  }
+
+  creditLimit(): Decimal {
+    const f = this.state.finance
+    const liquid = this.state.cash.add(f.savings).add(this.holdingsValue())
+    return liquid.mul(1.5).add(1000)
+  }
+
+  borrow(amount: Decimal | number): boolean {
+    let amt = D(amount)
+    const room = this.creditLimit().sub(this.state.finance.debt)
+    if (room.lte(0) || amt.lte(0)) return false
+    if (amt.gt(room)) amt = room
+    this.state.finance.debt = this.state.finance.debt.add(amt)
+    this.credit(amt)
+    return true
+  }
+
+  repay(amount: Decimal | number): boolean {
+    let amt = D(amount)
+    if (amt.gt(this.state.finance.debt)) amt = this.state.finance.debt
+    if (amt.gt(this.state.cash)) amt = this.state.cash
+    if (amt.lte(0)) return false
+    this.state.cash = this.state.cash.sub(amt)
+    this.state.finance.debt = this.state.finance.debt.sub(amt)
+    return true
+  }
+
+  buyBond(productId: string): boolean {
+    const p = BOND_BY_ID[productId]
+    if (!p) return false
+    if (this.state.cash.lt(p.principal)) return false
+    this.state.cash = this.state.cash.sub(p.principal)
+    this.state.finance.bonds.push({
+      id: this.state.finance.nextBondId++,
+      productId,
+      principal: p.principal,
+      payout: p.principal * (1 + p.yield),
+      remaining: p.term,
+    })
+    return true
+  }
+
+  instrumentPrice(id: string): number {
+    return this.state.finance.prices[id] ?? 0
+  }
+
+  maxShares(id: string): number {
+    const price = this.state.finance.prices[id]
+    if (!price || price <= 0) return 0
+    return Math.floor(this.state.cash.div(price).toNumber())
+  }
+
+  buyInstrument(id: string, qty: number): boolean {
+    if (qty <= 0) return false
+    const cost = D(this.state.finance.prices[id]).mul(qty)
+    if (this.state.cash.lt(cost)) return false
+    this.state.cash = this.state.cash.sub(cost)
+    this.state.finance.holdings[id] = (this.state.finance.holdings[id] ?? 0) + qty
+    return true
+  }
+
+  sellInstrument(id: string, qty: number): boolean {
+    const have = this.state.finance.holdings[id] ?? 0
+    const q = Math.min(qty, have)
+    if (q <= 0) return false
+    this.credit(D(this.state.finance.prices[id]).mul(q))
+    this.state.finance.holdings[id] = have - q
+    return true
+  }
+
+  private tickFinance(dt: number): void {
+    const f = this.state.finance
+    if (f.savings.gt(0)) f.savings = f.savings.add(f.savings.mul((SAVINGS_APR * dt) / GAME_YEAR))
+    if (f.debt.gt(0)) f.debt = f.debt.add(f.debt.mul((LOAN_APR * dt) / GAME_YEAR))
+    for (let i = f.bonds.length - 1; i >= 0; i--) {
+      f.bonds[i].remaining -= dt
+      if (f.bonds[i].remaining <= 0) {
+        this.credit(D(f.bonds[i].payout))
+        f.bonds.splice(i, 1)
+      }
+    }
+  }
+
+  /** Online-only: advance market prices and sample sparkline history. */
+  tickMarkets(dt: number): void {
+    if (dt <= 0) return
+    const f = this.state.finance
+    for (const inst of INSTRUMENT_DEFS) {
+      f.prices[inst.id] = nextPrice(inst, f.prices[inst.id] ?? inst.start, dt)
+    }
+    this.marketSampleAcc += dt
+    if (this.marketSampleAcc >= MARKET_SAMPLE) {
+      this.marketSampleAcc = 0
+      for (const inst of INSTRUMENT_DEFS) {
+        const h = f.history[inst.id] ?? (f.history[inst.id] = [])
+        h.push(f.prices[inst.id])
+        if (h.length > HISTORY_LEN) h.shift()
+      }
     }
   }
 

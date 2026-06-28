@@ -5,6 +5,7 @@ import { BUSINESS_DEFS, initialBusinessStates } from './businesses'
 import { initialResources } from './resources'
 import { initialFacilities } from './facilities'
 import { FIRST_OFFER_DELAY } from './contracts'
+import { initialFinance } from './finance'
 import type { GameState } from './types'
 
 export const SAVE_VERSION = 1
@@ -24,6 +25,7 @@ export function initialState(): GameState {
     resources: initialResources(),
     facilities: initialFacilities(),
     contracts: { available: [], active: [], nextId: 1, refreshTimer: FIRST_OFFER_DELAY },
+    finance: initialFinance(),
     lastSaved: Date.now(),
   }
 }

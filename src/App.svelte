@@ -8,6 +8,7 @@
   import Shop from './ui/Shop.svelte'
   import RealEstate from './ui/RealEstate.svelte'
   import Industry from './ui/Industry.svelte'
+  import Finance from './ui/Finance.svelte'
   import OfflineModal from './ui/OfflineModal.svelte'
   import SaveBar from './ui/SaveBar.svelte'
 
@@ -16,7 +17,7 @@
 |   from a lemonade stand to a metropolis    |
 +-------------------------------------------+`
 
-  type Tab = 'work' | 'city' | 'industry'
+  type Tab = 'work' | 'city' | 'industry' | 'finance'
   let tab = $state<Tab>('work')
 
   onMount(() => {
@@ -36,6 +37,9 @@
       <button class:active={tab === 'work'} onclick={() => (tab = 'work')}>Work</button>
       <button class:active={tab === 'city'} onclick={() => (tab = 'city')}>City</button>
       <button class:active={tab === 'industry'} onclick={() => (tab = 'industry')}>Industry</button>
+      {#if view.finance.unlocked}
+        <button class:active={tab === 'finance'} onclick={() => (tab = 'finance')}>Finance</button>
+      {/if}
     </nav>
   </div>
 
@@ -52,8 +56,10 @@
   {:else if tab === 'city'}
     <CityMap />
     <RealEstate />
-  {:else}
+  {:else if tab === 'industry'}
     <Industry />
+  {:else if tab === 'finance'}
+    <Finance />
   {/if}
 
   <SaveBar />

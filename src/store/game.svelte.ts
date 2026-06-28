@@ -16,6 +16,8 @@ import { layoutCity, cityTier, densityGlyph, densityName } from '../engine/city'
 import { FACILITY_DEFS } from '../engine/facilities'
 import { RESOURCE_DEFS, RESOURCE_BY_ID } from '../engine/resources'
 import { MAX_ACTIVE } from '../engine/contracts'
+import { INSTRUMENT_DEFS } from '../engine/market'
+import { BOND_PRODUCTS, BOND_BY_ID, SAVINGS_APR, LOAN_APR } from '../engine/finance'
 import { THEMES } from '../theme/themes'
 import type { CellKind, PlacedCell } from '../engine/city'
 import type { ResourceId, ThemeId } from '../engine/types'
@@ -30,6 +32,21 @@ const THEME_UNLOCK: Record<ThemeId, string | null> = {
   dark: 'ui_dark',
   amber: 'ui_amber',
   blue: 'ui_blue',
+}
+
+const SPARK = '▁▂▃▄▅▆▇█'
+function sparkline(history: number[]): string {
+  if (history.length < 2) return ''
+  let min = Infinity
+  let max = -Infinity
+  for (const v of history) {
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  const range = max - min || 1
+  return history
+    .map((v) => SPARK[Math.min(SPARK.length - 1, Math.round(((v - min) / range) * (SPARK.length - 1)))])
+    .join('')
 }
 
 export interface BusinessRow {
@@ -124,6 +141,37 @@ export interface ActiveRow {
   canDeliver: boolean
 }
 
+export interface InstrumentRow {
+  id: string
+  name: string
+  ticker: string
+  priceText: string
+  changePct: string
+  up: boolean
+  shares: number
+  valueText: string
+  spark: string
+  canBuy1: boolean
+  canBuy10: boolean
+  canSellAll: boolean
+}
+
+export interface BondProductRow {
+  id: string
+  name: string
+  principalText: string
+  yieldText: string
+  termText: string
+  canBuy: boolean
+}
+
+export interface ActiveBondRow {
+  id: number
+  name: string
+  payoutText: string
+  remainingText: string
+}
+
 export const view = $state({
   cashText: '$0.00',
   incomeText: '$0.00/s',
@@ -158,6 +206,23 @@ export const view = $state({
     machines: [] as UpgradeRow[],
     offers: [] as OfferRow[],
     active: [] as ActiveRow[],
+  },
+  finance: {
+    unlocked: false,
+    netWorthText: '$0.00',
+    savingsText: '$0.00',
+    aprText: `${Math.round(SAVINGS_APR * 100)}%/yr`,
+    canDeposit: false,
+    canWithdraw: false,
+    debtText: '$0.00',
+    creditAvailText: '$0.00',
+    loanAprText: `${Math.round(LOAN_APR * 100)}%/yr`,
+    canBorrow: false,
+    canRepay: false,
+    bonds: [] as ActiveBondRow[],
+    products: [] as BondProductRow[],
+    stocks: [] as InstrumentRow[],
+    fx: [] as InstrumentRow[],
   },
 })
 
@@ -349,6 +414,67 @@ function snapshot(): void {
     remainingText: `${Math.max(0, Math.ceil(c.remaining))}s`,
     canDeliver: engine.canDeliver(c),
   }))
+
+  // --- finance ---
+  const f = s.finance
+  view.finance.unlocked = engine.financeUnlocked()
+  view.finance.netWorthText = formatMoney(engine.netWorth(), ab)
+  view.finance.savingsText = formatMoney(f.savings, ab)
+  view.finance.canDeposit = s.cash.gt(0)
+  view.finance.canWithdraw = f.savings.gt(0)
+  view.finance.debtText = formatMoney(f.debt, ab)
+  const creditAvail = engine.creditLimit().sub(f.debt)
+  view.finance.creditAvailText = formatMoney(creditAvail.gt(0) ? creditAvail : D(0), ab)
+  view.finance.canBorrow = creditAvail.gt(0)
+  view.finance.canRepay = f.debt.gt(0) && s.cash.gt(0)
+
+  view.finance.products = BOND_PRODUCTS.map((p): BondProductRow => ({
+    id: p.id,
+    name: p.name,
+    principalText: formatMoney(D(p.principal), ab),
+    yieldText: `+${Math.round(p.yield * 100)}%`,
+    termText: `${p.term}s`,
+    canBuy: s.cash.gte(p.principal),
+  }))
+  view.finance.bonds = f.bonds.map((b): ActiveBondRow => ({
+    id: b.id,
+    name: BOND_BY_ID[b.productId]?.name ?? 'Bond',
+    payoutText: formatMoney(D(b.payout), ab),
+    remainingText: `${Math.max(0, Math.ceil(b.remaining))}s`,
+  }))
+
+  const stocks: InstrumentRow[] = []
+  const fx: InstrumentRow[] = []
+  for (const inst of INSTRUMENT_DEFS) {
+    const price = f.prices[inst.id]
+    const shares = f.holdings[inst.id] ?? 0
+    const hist = f.history[inst.id] ?? []
+    let changePct = '—'
+    let up = true
+    if (hist.length >= 2 && hist[0] > 0) {
+      const pct = ((price - hist[0]) / hist[0]) * 100
+      up = pct >= 0
+      changePct = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%'
+    }
+    const row: InstrumentRow = {
+      id: inst.id,
+      name: inst.name,
+      ticker: inst.ticker,
+      priceText: formatMoney(D(price), ab),
+      changePct,
+      up,
+      shares,
+      valueText: formatMoney(D(price).mul(shares), ab),
+      spark: sparkline(hist),
+      canBuy1: s.cash.gte(price),
+      canBuy10: s.cash.gte(price * 10),
+      canSellAll: shares > 0,
+    }
+    if (inst.kind === 'stock') stocks.push(row)
+    else fx.push(row)
+  }
+  view.finance.stocks = stocks
+  view.finance.fx = fx
 }
 
 // ---- actions -------------------------------------------------------------
@@ -443,6 +569,46 @@ export function declineContract(id: number): void {
   snapshot()
 }
 
+export function depositMax(): void {
+  engine.depositSavings(engine.state.cash)
+  snapshot()
+}
+
+export function depositHalf(): void {
+  engine.depositSavings(engine.state.cash.div(2))
+  snapshot()
+}
+
+export function withdrawMax(): void {
+  engine.withdrawSavings(engine.state.finance.savings)
+  snapshot()
+}
+
+export function borrowMax(): void {
+  engine.borrow(engine.creditLimit().sub(engine.state.finance.debt))
+  snapshot()
+}
+
+export function repayMax(): void {
+  engine.repay(engine.state.finance.debt)
+  snapshot()
+}
+
+export function buyBond(id: string): void {
+  engine.buyBond(id)
+  snapshot()
+}
+
+export function buyShares(id: string, qty: number): void {
+  engine.buyInstrument(id, qty)
+  snapshot()
+}
+
+export function sellAll(id: string): void {
+  engine.sellInstrument(id, engine.state.finance.holdings[id] ?? 0)
+  snapshot()
+}
+
 export function dismissOffline(): void {
   view.offline = null
 }
@@ -502,6 +668,7 @@ function frame(now: number): void {
   last = now
   engine.tick(dt)
   engine.tickContracts(dt)
+  engine.tickMarkets(dt)
   if (now - lastSnap >= SNAP_MS) {
     snapshot()
     lastSnap = now
