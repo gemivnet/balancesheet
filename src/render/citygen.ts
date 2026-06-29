@@ -35,6 +35,7 @@ export interface CityGen {
   groundColor(x: number, y: number): string
   district(x: number, y: number): District
   block(x: number, y: number, density: number): { base: string; h: number; district: District }
+  treeAt(x: number, y: number): boolean
 }
 
 export function makeCity(seed: number): CityGen {
@@ -67,5 +68,9 @@ export function makeCity(seed: number): CityGen {
     return { base, h: baseH + density * 2 + ((h * 8) | 0), district: d }
   }
 
-  return { isWater, groundColor, district, block }
+  function treeAt(x: number, y: number): boolean {
+    return hash(seed ^ 0x55, x, y) > 0.74
+  }
+
+  return { isWater, groundColor, district, block, treeAt }
 }

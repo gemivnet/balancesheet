@@ -8,8 +8,8 @@
   let wrap: HTMLDivElement
   let ctx: CanvasRenderingContext2D | null = null
 
-  const TW = 48 // base iso tile width
-  const TH = 24 // base iso tile height (2:1)
+  const TW = 48
+  const TH = 24
   const DENS = 'nAHM#@'
   const CIVIC_COLOR: Record<string, string> = {
     townhall: '#5c7cfa',
@@ -37,6 +37,9 @@
   let frontOrder: CityCell[] = []
   let cityGen: CityGen = makeCity(0)
   let seedUsed = -1
+  let bbox = { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+
+  type Pt = [number, number]
 
   function darken(hex: string, f: number): string {
     const n = parseInt(hex.slice(1), 16)
@@ -59,7 +62,11 @@
     return null
   }
 
-  type Pt = [number, number]
+  const odd = (n: number) => Math.abs(n) % 2 === 1
+  const inCity = (x: number, y: number) =>
+    x >= bbox.minX && x <= bbox.maxX && y >= bbox.minY && y <= bbox.maxY
+  const isRoad = (c: CityCell) => c.kind === 'empty' && inCity(c.x, c.y) && (odd(c.x) || odd(c.y))
+
   function diamond(px: number, py: number, lift = 0): Pt[] {
     return [
       [px, py - thz / 2 - lift],
@@ -92,6 +99,23 @@
     ctx.lineWidth = w
     ctx.stroke()
   }
+  function lerp(a: Pt, b: Pt, t: number): Pt {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
+  }
+  function seg(a: Pt, b: Pt, color: string) {
+    if (!ctx) return
+    ctx.beginPath()
+    ctx.moveTo(a[0], a[1])
+    ctx.lineTo(b[0], b[1])
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+  function windows(face: Pt[]) {
+    const [a, b, c, d] = face // a ground-out, b ground-bottom, c top-bottom, d top-out
+    for (const f of [0.36, 0.7]) seg(lerp(a, d, f), lerp(b, c, f), 'rgba(0,0,0,0.16)')
+    seg(lerp(a, b, 0.5), lerp(d, c, 0.5), 'rgba(0,0,0,0.16)')
+  }
   function pointInPoly(x: number, y: number, p: Pt[]): boolean {
     let inside = false
     for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
@@ -104,7 +128,7 @@
     return inside
   }
 
-  function centerOf(W: number, Ht: number) {
+  function autoCenter(W: number, Ht: number) {
     const cells = view.city.cells
     let minSX = Infinity
     let maxSX = -Infinity
@@ -118,7 +142,11 @@
       if (sy < minSY) minSY = sy
       if (sy > maxSY) maxSY = sy
     }
-    return { cx: W / 2 - (minSX + maxSX) / 2 + panX, cy: Ht / 2 - (minSY + maxSY) / 2 + panY }
+    return { ax: W / 2 - (minSX + maxSX) / 2, ay: Ht / 2 - (minSY + maxSY) / 2 }
+  }
+  function centerOf(W: number, Ht: number) {
+    const a = autoCenter(W, Ht)
+    return { cx: a.ax + panX, cy: a.ay + panY }
   }
 
   function drawGround(px: number, py: number, c: CityCell) {
@@ -131,16 +159,45 @@
       fill = '#ffe27a'
       stroke = '#e0a82e'
     } else {
-      fill = cityGen.groundColor(c.x, c.y)
-      stroke = darken(fill, 0.85)
+      const water = cityGen.isWater(c.x, c.y)
+      const road = inCity(c.x, c.y) && (odd(c.x) || odd(c.y))
+      if (road && water) {
+        fill = '#9c7b4f' // bridge
+        stroke = '#7d6240'
+      } else if (road) {
+        fill = '#6f747c' // asphalt
+        stroke = '#5c616a'
+      } else {
+        fill = cityGen.groundColor(c.x, c.y)
+        stroke = darken(fill, 0.85)
+      }
     }
     poly(diamond(px, py), fill, stroke)
   }
+  function drawTree(px: number, py: number) {
+    if (!ctx) return
+    const r = twz * 0.16
+    ctx.fillStyle = '#6b4f2a'
+    ctx.fillRect(px - 1.5, py - r * 0.3, 3, r * 0.7)
+    ctx.beginPath()
+    ctx.arc(px, py - r * 0.6, r, 0, Math.PI * 2)
+    ctx.fillStyle = '#4f8f43'
+    ctx.fill()
+    ctx.strokeStyle = '#3c7a33'
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
   function drawBox(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
     const h = b.h * zoom
-    poly(leftFace(px, py, h), b.left, 'rgba(0,0,0,0.2)')
-    poly(rightFace(px, py, h), b.right, 'rgba(0,0,0,0.2)')
+    const lf = leftFace(px, py, h)
+    const rf = rightFace(px, py, h)
+    poly(lf, b.left, 'rgba(0,0,0,0.2)')
+    poly(rf, b.right, 'rgba(0,0,0,0.2)')
     poly(diamond(px, py, h), b.top, 'rgba(0,0,0,0.16)')
+    if (zoom > 0.55 && h > 13) {
+      windows(lf)
+      windows(rf)
+    }
   }
 
   function draw() {
@@ -163,6 +220,16 @@
 
     const cells = view.city.cells
     if (cells.length === 0) return
+
+    bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+    for (const c of cells) {
+      if (c.kind === 'empty') continue
+      if (c.x < bbox.minX) bbox.minX = c.x
+      if (c.x > bbox.maxX) bbox.maxX = c.x
+      if (c.y < bbox.minY) bbox.minY = c.y
+      if (c.y > bbox.maxY) bbox.maxY = c.y
+    }
+
     const sorted = [...cells].sort((a, b) => a.x + a.y - (b.x + b.y))
     frontOrder = sorted.slice().reverse()
     const { cx, cy } = centerOf(W, Ht)
@@ -173,6 +240,15 @@
     for (const c of sorted) {
       const b = building(c)
       if (b) drawBox(sx(c), sy(c), b)
+      else if (
+        zoom > 0.55 &&
+        c.kind === 'empty' &&
+        !isRoad(c) &&
+        !cityGen.isWater(c.x, c.y) &&
+        cityGen.treeAt(c.x, c.y)
+      ) {
+        drawTree(sx(c), sy(c))
+      }
     }
 
     if (hoverKey) {
@@ -230,7 +306,6 @@
     if (c.kind === 'civic') return `${c.label} · click to open`
     return ''
   }
-
   function onTile(c: CityCell) {
     if (c.kind === 'business' && c.businessId) {
       setActive(c.businessId)
@@ -294,7 +369,24 @@
   }
   function wheel(e: WheelEvent) {
     e.preventDefault()
+    const rect = canvas.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const W = wrap.clientWidth
+    const Ht = wrap.clientHeight
+    twz = TW * zoom
+    thz = TH * zoom
+    const o0 = centerOf(W, Ht)
+    const ux = mx - o0.cx
+    const uy = my - o0.cy
+    const fx = (ux / (twz / 2) + uy / (thz / 2)) / 2
+    const fy = (uy / (thz / 2) - ux / (twz / 2)) / 2
     zoom = Math.min(2.4, Math.max(0.4, zoom * Math.exp(-e.deltaY * 0.0015)))
+    twz = TW * zoom
+    thz = TH * zoom
+    const a = autoCenter(W, Ht)
+    panX = mx - ((fx - fy) * twz) / 2 - a.ax
+    panY = my - ((fx + fy) * thz) / 2 - a.ay
     draw()
   }
   function zoomBy(f: number) {
