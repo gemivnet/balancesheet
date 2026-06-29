@@ -2,24 +2,28 @@
   import { onMount } from 'svelte'
   import { view, setActive, openMenu } from '../store/game.svelte'
   import type { CityCell } from '../store/game.svelte'
+  import { makeCity, type CityGen } from '../render/citygen'
 
   let canvas: HTMLCanvasElement
   let wrap: HTMLDivElement
   let ctx: CanvasRenderingContext2D | null = null
 
-  const TW = 52 // iso tile width
-  const TH = 26 // iso tile height (2:1)
-  const DENS = 'nAHM#@' // rental density glyphs -> taller buildings
+  const TW = 48 // base iso tile width
+  const TH = 24 // base iso tile height (2:1)
+  const DENS = 'nAHM#@'
   const CIVIC_COLOR: Record<string, string> = {
     townhall: '#5c7cfa',
     realtor: '#15aabf',
     hq: '#9c36b5',
-    factory: '#868e96',
+    factory: '#f08c2e',
     bank: '#37b24d',
   }
 
   let panX = 0
   let panY = 0
+  let zoom = 1
+  let twz = TW
+  let thz = TH
   let hoverKey = $state<string | null>(null)
   let tip = $state({ show: false, x: 0, y: 0, text: '' })
 
@@ -30,7 +34,9 @@
   let panStartX = 0
   let panStartY = 0
 
-  let frontOrder: CityCell[] = [] // cells front-to-back, for picking (cached from draw)
+  let frontOrder: CityCell[] = []
+  let cityGen: CityGen = makeCity(0)
+  let seedUsed = -1
 
   function darken(hex: string, f: number): string {
     const n = parseInt(hex.slice(1), 16)
@@ -42,37 +48,24 @@
   function building(cell: CityCell) {
     if (cell.kind === 'business') {
       const palette: Record<string, string> = { L: '#f6c945', C: '#9c6b4a', R: '#6d8aa6' }
-      return box(palette[cell.glyph] ?? '#5bb6a6', 34)
+      return box(palette[cell.glyph] ?? '#5bb6a6', 16)
     }
-    if (cell.kind === 'rental') return box('#e0796b', 22 + Math.max(0, DENS.indexOf(cell.glyph)) * 14)
-    if (cell.kind === 'civic') return box(CIVIC_COLOR[cell.civic ?? ''] ?? '#888', 48)
+    if (cell.kind === 'rental') {
+      const den = Math.max(0, DENS.indexOf(cell.glyph))
+      const b = cityGen.block(cell.x, cell.y, den)
+      return box(b.base, b.h)
+    }
+    if (cell.kind === 'civic') return box(CIVIC_COLOR[cell.civic ?? ''] ?? '#888', 20)
     return null
-  }
-
-  function centerOf(W: number, Ht: number) {
-    const cells = view.city.cells
-    let minSX = Infinity
-    let maxSX = -Infinity
-    let minSY = Infinity
-    let maxSY = -Infinity
-    for (const c of cells) {
-      const sx = (c.x - c.y) * (TW / 2)
-      const sy = (c.x + c.y) * (TH / 2)
-      if (sx < minSX) minSX = sx
-      if (sx > maxSX) maxSX = sx
-      if (sy < minSY) minSY = sy
-      if (sy > maxSY) maxSY = sy
-    }
-    return { cx: W / 2 - (minSX + maxSX) / 2 + panX, cy: Ht / 2 - (minSY + maxSY) / 2 + panY }
   }
 
   type Pt = [number, number]
   function diamond(px: number, py: number, lift = 0): Pt[] {
     return [
-      [px, py - TH / 2 - lift],
-      [px + TW / 2, py - lift],
-      [px, py + TH / 2 - lift],
-      [px - TW / 2, py - lift],
+      [px, py - thz / 2 - lift],
+      [px + twz / 2, py - lift],
+      [px, py + thz / 2 - lift],
+      [px - twz / 2, py - lift],
     ]
   }
   function leftFace(px: number, py: number, h: number): Pt[] {
@@ -111,26 +104,53 @@
     return inside
   }
 
+  function centerOf(W: number, Ht: number) {
+    const cells = view.city.cells
+    let minSX = Infinity
+    let maxSX = -Infinity
+    let minSY = Infinity
+    let maxSY = -Infinity
+    for (const c of cells) {
+      const sx = (c.x - c.y) * (twz / 2)
+      const sy = (c.x + c.y) * (thz / 2)
+      if (sx < minSX) minSX = sx
+      if (sx > maxSX) maxSX = sx
+      if (sy < minSY) minSY = sy
+      if (sy > maxSY) maxSY = sy
+    }
+    return { cx: W / 2 - (minSX + maxSX) / 2 + panX, cy: Ht / 2 - (minSY + maxSY) / 2 + panY }
+  }
+
   function drawGround(px: number, py: number, c: CityCell) {
-    let fill = '#8ec06c'
-    let stroke = '#74a857'
+    let fill: string
+    let stroke: string
     if (c.kind === 'business' || c.kind === 'rental' || c.kind === 'civic') {
       fill = '#cbc8bf'
       stroke = '#b1aea4'
     } else if (c.kind === 'forSale') {
       fill = '#ffe27a'
       stroke = '#e0a82e'
+    } else {
+      fill = cityGen.groundColor(c.x, c.y)
+      stroke = darken(fill, 0.85)
     }
     poly(diamond(px, py), fill, stroke)
   }
   function drawBox(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
-    poly(leftFace(px, py, b.h), b.left, 'rgba(0,0,0,0.18)')
-    poly(rightFace(px, py, b.h), b.right, 'rgba(0,0,0,0.18)')
-    poly(diamond(px, py, b.h), b.top, 'rgba(0,0,0,0.14)')
+    const h = b.h * zoom
+    poly(leftFace(px, py, h), b.left, 'rgba(0,0,0,0.2)')
+    poly(rightFace(px, py, h), b.right, 'rgba(0,0,0,0.2)')
+    poly(diamond(px, py, h), b.top, 'rgba(0,0,0,0.16)')
   }
 
   function draw() {
     if (!ctx || !canvas || !wrap) return
+    if (view.citySeed !== seedUsed) {
+      cityGen = makeCity(view.citySeed)
+      seedUsed = view.citySeed
+    }
+    twz = TW * zoom
+    thz = TH * zoom
     const dpr = window.devicePixelRatio || 1
     const W = wrap.clientWidth
     const Ht = wrap.clientHeight
@@ -146,8 +166,8 @@
     const sorted = [...cells].sort((a, b) => a.x + a.y - (b.x + b.y))
     frontOrder = sorted.slice().reverse()
     const { cx, cy } = centerOf(W, Ht)
-    const sx = (c: CityCell) => cx + (c.x - c.y) * (TW / 2)
-    const sy = (c: CityCell) => cy + (c.x + c.y) * (TH / 2)
+    const sx = (c: CityCell) => cx + (c.x - c.y) * (twz / 2)
+    const sy = (c: CityCell) => cy + (c.x + c.y) * (thz / 2)
 
     for (const c of sorted) drawGround(sx(c), sy(c), c)
     for (const c of sorted) {
@@ -155,23 +175,21 @@
       if (b) drawBox(sx(c), sy(c), b)
     }
 
-    // hover highlight
     if (hoverKey) {
       const c = cells.find((x) => x.key === hoverKey)
       if (c) {
         const b = building(c)
-        const top = b ? diamond(sx(c), sy(c), b.h) : diamond(sx(c), sy(c))
+        const top = b ? diamond(sx(c), sy(c), b.h * zoom) : diamond(sx(c), sy(c))
         poly(top, 'rgba(255,214,0,0.4)', '#ffce00', 2.5)
       }
     }
 
-    // civic labels float above their buildings
     ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
     ctx.textAlign = 'center'
     for (const c of sorted) {
       if (c.kind !== 'civic') continue
       const lx = sx(c)
-      const ly = sy(c) - 48 - 9
+      const ly = sy(c) - 20 * zoom - 9
       const w = ctx.measureText(c.label).width
       ctx.fillStyle = 'rgba(0,0,0,0.78)'
       ctx.fillRect(lx - w / 2 - 4, ly - 9, w + 8, 14)
@@ -187,14 +205,15 @@
     const my = clientY - rect.top
     const { cx, cy } = centerOf(wrap.clientWidth, wrap.clientHeight)
     for (const c of frontOrder) {
-      const px = cx + (c.x - c.y) * (TW / 2)
-      const py = cy + (c.x + c.y) * (TH / 2)
+      const px = cx + (c.x - c.y) * (twz / 2)
+      const py = cy + (c.x + c.y) * (thz / 2)
       const b = building(c)
       if (b) {
+        const h = b.h * zoom
         if (
-          pointInPoly(mx, my, diamond(px, py, b.h)) ||
-          pointInPoly(mx, my, leftFace(px, py, b.h)) ||
-          pointInPoly(mx, my, rightFace(px, py, b.h))
+          pointInPoly(mx, my, diamond(px, py, h)) ||
+          pointInPoly(mx, my, leftFace(px, py, h)) ||
+          pointInPoly(mx, my, rightFace(px, py, h))
         )
           return c
       } else if (pointInPoly(mx, my, diamond(px, py))) {
@@ -273,9 +292,19 @@
     }
     tip = { ...tip, show: false }
   }
+  function wheel(e: WheelEvent) {
+    e.preventDefault()
+    zoom = Math.min(2.4, Math.max(0.4, zoom * Math.exp(-e.deltaY * 0.0015)))
+    draw()
+  }
+  function zoomBy(f: number) {
+    zoom = Math.min(2.4, Math.max(0.4, zoom * f))
+    draw()
+  }
   function recenter() {
     panX = 0
     panY = 0
+    zoom = 1
     draw()
   }
 
@@ -289,6 +318,7 @@
 
   $effect(() => {
     view.city.cells
+    view.citySeed
     draw()
   })
 </script>
@@ -302,10 +332,15 @@
       onpointermove={move}
       onpointerup={up}
       onpointerleave={leave}
+      onwheel={wheel}
     ></canvas>
     {#if tip.show}
       <div class="city-tip" style="left:{tip.x + 14}px; top:{tip.y + 14}px">{tip.text}</div>
     {/if}
   </div>
-  <button class="city-recenter mini" onclick={recenter}>recenter</button>
+  <div class="city-controls">
+    <button class="mini" onclick={() => zoomBy(1 / 1.25)} aria-label="zoom out">−</button>
+    <button class="mini" onclick={recenter}>recenter</button>
+    <button class="mini" onclick={() => zoomBy(1.25)} aria-label="zoom in">+</button>
+  </div>
 </div>

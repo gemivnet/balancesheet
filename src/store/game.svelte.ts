@@ -215,6 +215,7 @@ export const view = $state({
   theme: 'mono' as ThemeId,
   cityGrid: false,
   cityIso: false,
+  citySeed: 0,
   themes: [] as ThemeRow[],
   activeName: '',
   businesses: [] as BusinessRow[],
@@ -268,6 +269,7 @@ function snapshot(): void {
   view.theme = s.ui.theme
   view.cityGrid = s.ui.cityGrid
   view.cityIso = s.ui.iso
+  view.citySeed = s.seed
   view.themes = THEME_ORDER.map((id): ThemeRow => ({
     id,
     label: THEMES[id].label,
@@ -589,6 +591,11 @@ export function setTheme(id: string): void {
     engine.state.ui.theme = t
     snapshot()
   }
+}
+
+export function rerollMap(): void {
+  engine.state.seed = Math.floor(Math.random() * 1_000_000_000)
+  snapshot()
 }
 
 export function buildFacility(id: string): void {

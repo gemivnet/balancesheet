@@ -160,6 +160,7 @@ export interface GameState {
   stats: { totalClicks: number }
   rentals: number // rental properties owned (real estate)
   densityLevel: number // housing density tier (boosts rent, denser buildings)
+  seed: number // procedural map look (cosmetic; saved)
   resources: Record<ResourceId, Decimal>
   facilities: Record<string, FacilityState>
   contracts: ContractBoard

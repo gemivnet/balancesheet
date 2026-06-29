@@ -25,6 +25,7 @@ interface SavedShape {
   stats: { totalClicks: number }
   rentals: number
   densityLevel: number
+  seed: number
   resources: Record<string, string>
   facilities: Record<string, number>
   contracts: ContractBoard
@@ -56,6 +57,7 @@ export function serialize(state: GameState): string {
     stats: { totalClicks: state.stats.totalClicks },
     rentals: state.rentals,
     densityLevel: state.densityLevel,
+    seed: state.seed,
     resources: Object.fromEntries(Object.entries(state.resources).map(([k, v]) => [k, v.toString()])),
     facilities: Object.fromEntries(Object.entries(state.facilities).map(([k, v]) => [k, v.owned])),
     contracts: state.contracts,
@@ -89,6 +91,7 @@ export function deserialize(raw: string): GameState {
   if (data.stats) state.stats.totalClicks = data.stats.totalClicks ?? 0
   if (typeof data.rentals === 'number') state.rentals = data.rentals
   if (typeof data.densityLevel === 'number') state.densityLevel = data.densityLevel
+  if (typeof data.seed === 'number') state.seed = data.seed
   if (data.resources) {
     for (const r of RESOURCE_DEFS) {
       const v = data.resources[r.id]

@@ -22,6 +22,7 @@ export function initialState(): GameState {
     stats: { totalClicks: 0 },
     rentals: 0,
     densityLevel: 0,
+    seed: Math.floor(Math.random() * 1_000_000_000),
     resources: initialResources(),
     facilities: initialFacilities(),
     contracts: { available: [], active: [], nextId: 1, refreshTimer: FIRST_OFFER_DELAY },

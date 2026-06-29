@@ -1061,11 +1061,17 @@ button.tile.civic:hover {
   inset: 0;
   height: auto;
 }
-.city-recenter {
+.city-controls {
   position: absolute;
   bottom: 10px;
   right: 10px;
   z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+.city-controls button {
+  font-size: 11px;
+  padding: 2px 8px;
 }
 .city-toggle {
   position: absolute;

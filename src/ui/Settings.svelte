@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { view, downloadSave, importSave, resetGame, setTheme } from '../store/game.svelte'
+  import { view, downloadSave, importSave, resetGame, setTheme, rerollMap } from '../store/game.svelte'
 
   let fileInput: HTMLInputElement
 
@@ -37,5 +37,13 @@
     </div>
   {/if}
 
-  <p class="hint">ASCII Tycoon saves to this browser. Export a save to back it up or move it.</p>
+  <h3>Map</h3>
+  <div class="settings-row">
+    <button onclick={rerollMap}>regenerate map look</button>
+  </div>
+
+  <p class="hint">
+    ASCII Tycoon saves to this browser. Export a save to back it up or move it. The map look
+    (rivers, districts, building shapes) is cosmetic — "regenerate" rolls a new one.
+  </p>
 </div>
