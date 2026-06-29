@@ -20,6 +20,8 @@
 
   let panX = 0
   let panY = 0
+  let hoverKey = $state<string | null>(null)
+  let tip = $state({ show: false, x: 0, y: 0, text: '' })
 
   let dragging = false
   let moved = false
@@ -28,6 +30,8 @@
   let panStartX = 0
   let panStartY = 0
 
+  let frontOrder: CityCell[] = [] // cells front-to-back, for picking (cached from draw)
+
   function darken(hex: string, f: number): string {
     const n = parseInt(hex.slice(1), 16)
     return `rgb(${Math.round(((n >> 16) & 255) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`
@@ -35,7 +39,6 @@
   function box(base: string, h: number) {
     return { top: base, left: darken(base, 0.78), right: darken(base, 0.6), h }
   }
-
   function building(cell: CityCell) {
     if (cell.kind === 'business') {
       const palette: Record<string, string> = { L: '#f6c945', C: '#9c6b4a', R: '#6d8aa6' }
@@ -60,13 +63,11 @@
       if (sy < minSY) minSY = sy
       if (sy > maxSY) maxSY = sy
     }
-    return {
-      cx: W / 2 - (minSX + maxSX) / 2 + panX,
-      cy: Ht / 2 - (minSY + maxSY) / 2 + panY,
-    }
+    return { cx: W / 2 - (minSX + maxSX) / 2 + panX, cy: Ht / 2 - (minSY + maxSY) / 2 + panY }
   }
 
-  function diamond(px: number, py: number, lift = 0): [number, number][] {
+  type Pt = [number, number]
+  function diamond(px: number, py: number, lift = 0): Pt[] {
     return [
       [px, py - TH / 2 - lift],
       [px + TW / 2, py - lift],
@@ -74,17 +75,40 @@
       [px - TW / 2, py - lift],
     ]
   }
-  function poly(pts: [number, number][], fill: string, stroke: string) {
+  function leftFace(px: number, py: number, h: number): Pt[] {
+    const g = diamond(px, py)
+    const t = diamond(px, py, h)
+    return [g[3], g[2], t[2], t[3]]
+  }
+  function rightFace(px: number, py: number, h: number): Pt[] {
+    const g = diamond(px, py)
+    const t = diamond(px, py, h)
+    return [g[2], g[1], t[1], t[2]]
+  }
+  function poly(pts: Pt[], fill: string | null, stroke: string, w = 1) {
     if (!ctx) return
     ctx.beginPath()
     ctx.moveTo(pts[0][0], pts[0][1])
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
     ctx.closePath()
-    ctx.fillStyle = fill
-    ctx.fill()
+    if (fill) {
+      ctx.fillStyle = fill
+      ctx.fill()
+    }
     ctx.strokeStyle = stroke
-    ctx.lineWidth = 1
+    ctx.lineWidth = w
     ctx.stroke()
+  }
+  function pointInPoly(x: number, y: number, p: Pt[]): boolean {
+    let inside = false
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const xi = p[i][0]
+      const yi = p[i][1]
+      const xj = p[j][0]
+      const yj = p[j][1]
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+    }
+    return inside
   }
 
   function drawGround(px: number, py: number, c: CityCell) {
@@ -100,11 +124,9 @@
     poly(diamond(px, py), fill, stroke)
   }
   function drawBox(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
-    const g = diamond(px, py)
-    const t = diamond(px, py, b.h)
-    poly([g[3], g[2], t[2], t[3]], b.left, 'rgba(0,0,0,0.18)')
-    poly([g[2], g[1], t[1], t[2]], b.right, 'rgba(0,0,0,0.18)')
-    poly(t, b.top, 'rgba(0,0,0,0.14)')
+    poly(leftFace(px, py, b.h), b.left, 'rgba(0,0,0,0.18)')
+    poly(rightFace(px, py, b.h), b.right, 'rgba(0,0,0,0.18)')
+    poly(diamond(px, py, b.h), b.top, 'rgba(0,0,0,0.14)')
   }
 
   function draw() {
@@ -122,6 +144,7 @@
     const cells = view.city.cells
     if (cells.length === 0) return
     const sorted = [...cells].sort((a, b) => a.x + a.y - (b.x + b.y))
+    frontOrder = sorted.slice().reverse()
     const { cx, cy } = centerOf(W, Ht)
     const sx = (c: CityCell) => cx + (c.x - c.y) * (TW / 2)
     const sy = (c: CityCell) => cy + (c.x + c.y) * (TH / 2)
@@ -131,6 +154,17 @@
       const b = building(c)
       if (b) drawBox(sx(c), sy(c), b)
     }
+
+    // hover highlight
+    if (hoverKey) {
+      const c = cells.find((x) => x.key === hoverKey)
+      if (c) {
+        const b = building(c)
+        const top = b ? diamond(sx(c), sy(c), b.h) : diamond(sx(c), sy(c))
+        poly(top, 'rgba(255,214,0,0.4)', '#ffce00', 2.5)
+      }
+    }
+
     // civic labels float above their buildings
     ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
     ctx.textAlign = 'center'
@@ -149,12 +183,33 @@
   function pick(clientX: number, clientY: number): CityCell | null {
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
+    const mx = clientX - rect.left
+    const my = clientY - rect.top
     const { cx, cy } = centerOf(wrap.clientWidth, wrap.clientHeight)
-    const u = clientX - rect.left - cx
-    const v = clientY - rect.top - cy
-    const tx = Math.round((u / (TW / 2) + v / (TH / 2)) / 2)
-    const ty = Math.round((v / (TH / 2) - u / (TW / 2)) / 2)
-    return view.city.cells.find((c) => c.x === tx && c.y === ty) ?? null
+    for (const c of frontOrder) {
+      const px = cx + (c.x - c.y) * (TW / 2)
+      const py = cy + (c.x + c.y) * (TH / 2)
+      const b = building(c)
+      if (b) {
+        if (
+          pointInPoly(mx, my, diamond(px, py, b.h)) ||
+          pointInPoly(mx, my, leftFace(px, py, b.h)) ||
+          pointInPoly(mx, my, rightFace(px, py, b.h))
+        )
+          return c
+      } else if (pointInPoly(mx, my, diamond(px, py))) {
+        return c
+      }
+    }
+    return null
+  }
+
+  function tipText(c: CityCell): string {
+    if (c.kind === 'business') return `${c.label} · click to manage`
+    if (c.kind === 'rental') return 'Rental property · real estate'
+    if (c.kind === 'forSale') return 'Lot for sale · buy property'
+    if (c.kind === 'civic') return `${c.label} · click to open`
+    return ''
   }
 
   function onTile(c: CityCell) {
@@ -175,15 +230,32 @@
     startY = e.clientY
     panStartX = panX
     panStartY = panY
+    canvas.style.cursor = 'grabbing'
   }
   function move(e: PointerEvent) {
-    if (!dragging) return
-    const dx = e.clientX - startX
-    const dy = e.clientY - startY
-    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true
-    panX = panStartX + dx
-    panY = panStartY + dy
-    draw()
+    if (dragging) {
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true
+      panX = panStartX + dx
+      panY = panStartY + dy
+      draw()
+      return
+    }
+    const c = pick(e.clientX, e.clientY)
+    const key = c && c.kind !== 'empty' ? c.key : null
+    const rect = wrap.getBoundingClientRect()
+    if (c && key) {
+      tip = { show: true, x: e.clientX - rect.left, y: e.clientY - rect.top, text: tipText(c) }
+      canvas.style.cursor = 'pointer'
+    } else {
+      if (tip.show) tip = { ...tip, show: false }
+      canvas.style.cursor = 'grab'
+    }
+    if (key !== hoverKey) {
+      hoverKey = key
+      draw()
+    }
   }
   function up(e: PointerEvent) {
     if (dragging && !moved) {
@@ -191,6 +263,15 @@
       if (c && c.kind !== 'empty') onTile(c)
     }
     dragging = false
+    canvas.style.cursor = hoverKey ? 'pointer' : 'grab'
+  }
+  function leave() {
+    dragging = false
+    if (hoverKey) {
+      hoverKey = null
+      draw()
+    }
+    tip = { ...tip, show: false }
   }
   function recenter() {
     panX = 0
@@ -220,8 +301,11 @@
       onpointerdown={down}
       onpointermove={move}
       onpointerup={up}
-      onpointerleave={up}
+      onpointerleave={leave}
     ></canvas>
+    {#if tip.show}
+      <div class="city-tip" style="left:{tip.x + 14}px; top:{tip.y + 14}px">{tip.text}</div>
+    {/if}
   </div>
   <button class="city-recenter mini" onclick={recenter}>recenter</button>
 </div>

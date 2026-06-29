@@ -171,6 +171,14 @@ export function layoutCity({ startedBusinesses, rentals, rentalGlyph }: LayoutIn
   const lot = free[i]
   if (lot) cells.push({ x: lot.x, y: lot.y, kind: 'forSale', glyph: '$', label: 'Lot for sale' })
 
+  // Space everything out so there are road gaps between buildings — each building
+  // gets its own tile and is easy to see and click.
+  const SPACING = 2
+  for (const c of cells) {
+    c.x *= SPACING
+    c.y *= SPACING
+  }
+
   const xs = cells.map((c) => c.x)
   const ys = cells.map((c) => c.y)
   return {
