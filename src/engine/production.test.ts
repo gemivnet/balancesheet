@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { Engine } from './engine'
 import { initialState } from './state'
 import { D } from './num'
+import { generateContract } from './contracts'
 import type { Contract } from './types'
 
 function newEngine(cash = 0): Engine {
@@ -103,5 +104,15 @@ describe('contracts', () => {
     e.state.contracts.refreshTimer = 0
     e.tickContracts(0.1)
     expect(e.state.contracts.available.length).toBe(1)
+  })
+
+  it('generates valid contracts across all job types', () => {
+    for (let i = 0; i < 80; i++) {
+      const c = generateContract(i)
+      expect(c.items.length).toBeGreaterThanOrEqual(1)
+      expect(c.reward).toBeGreaterThan(0)
+      expect(c.timeLimit).toBeGreaterThan(0)
+      for (const it of c.items) expect(it.amount).toBeGreaterThan(0)
+    }
   })
 })

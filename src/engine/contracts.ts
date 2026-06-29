@@ -1,72 +1,81 @@
 // Contracts ("jobs you choose"): randomly generated orders to deliver goods before
-// a deadline for a cash reward. Several job *types* keep the board varied:
-//   - delivery: a steady single-resource order
-//   - rush:     small amount, tight deadline, premium pay
-//   - bulk:     large amount, long deadline, big total
-//   - supply:   two different resources at once
+// a deadline for a cash reward. Job *types* keep the board varied:
+//   delivery   – steady single-resource order
+//   rush       – small amount, tight deadline, premium pay
+//   express    – tiny amount, very tight deadline, huge premium
+//   bulk       – large amount, long deadline, big total
+//   wholesale  – huge amount, long deadline, thin margin but massive total
+//   supply     – two different resources at once
+//   mega       – three different resources at once
 // Contracts are saved (plain numbers), so generation can use Math.random freely.
 
 import { RESOURCE_VALUE } from './resources'
-import type { Contract, ContractType, ResourceId } from './types'
+import type { Contract, ContractItem, ContractType, ResourceId } from './types'
 
 export const CONTRACT_RESOURCES: ResourceId[] = ['wood', 'ore', 'planks', 'metal', 'goods']
 
-export const MAX_AVAILABLE = 5
-export const MAX_ACTIVE = 5
-export const CONTRACT_REFRESH = 20 // seconds between new offers
+export const MAX_AVAILABLE = 6
+export const MAX_ACTIVE = 6
+export const CONTRACT_REFRESH = 18 // seconds between new offers
 export const FIRST_OFFER_DELAY = 3
 
-const TYPE_WEIGHTS: ContractType[] = ['delivery', 'delivery', 'delivery', 'rush', 'bulk', 'supply']
+const WEIGHTS: ContractType[] = [
+  'delivery',
+  'delivery',
+  'delivery',
+  'rush',
+  'bulk',
+  'supply',
+  'express',
+  'wholesale',
+  'mega',
+]
+
+type SingleType = Exclude<ContractType, 'supply' | 'mega'>
+interface Cfg {
+  amt: [number, number]
+  time: [number, number]
+  margin: [number, number]
+}
+const SINGLE: Record<SingleType, Cfg> = {
+  delivery: { amt: [15, 60], time: [90, 160], margin: [1.6, 2.0] },
+  rush: { amt: [8, 25], time: [35, 60], margin: [2.3, 3.0] },
+  express: { amt: [6, 16], time: [18, 32], margin: [3.0, 4.2] },
+  bulk: { amt: [80, 200], time: [200, 300], margin: [1.5, 1.8] },
+  wholesale: { amt: [250, 500], time: [300, 420], margin: [1.35, 1.6] },
+}
 
 function rand(min: number, max: number): number {
   return min + Math.random() * (max - min)
 }
-
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
 export function generateContract(id: number): Contract {
-  const type = pick(TYPE_WEIGHTS)
+  const type = pick(WEIGHTS)
 
-  if (type === 'supply') {
-    const r1 = pick(CONTRACT_RESOURCES)
-    let r2 = pick(CONTRACT_RESOURCES)
-    for (let g = 0; r2 === r1 && g < 6; g++) r2 = pick(CONTRACT_RESOURCES)
-    const a1 = Math.round(rand(15, 45))
-    const a2 = Math.round(rand(15, 45))
-    const timeLimit = Math.round(rand(120, 200))
-    const reward = Math.round((a1 * RESOURCE_VALUE[r1] + a2 * RESOURCE_VALUE[r2]) * rand(1.8, 2.3))
-    return {
-      id,
-      type,
-      items: [
-        { resource: r1, amount: a1 },
-        { resource: r2, amount: a2 },
-      ],
-      reward,
-      timeLimit,
-      remaining: timeLimit,
+  if (type === 'supply' || type === 'mega') {
+    const n = type === 'mega' ? 3 : 2
+    const used = new Set<ResourceId>()
+    const items: ContractItem[] = []
+    for (let k = 0; k < n; k++) {
+      let r = pick(CONTRACT_RESOURCES)
+      for (let g = 0; used.has(r) && g < 8; g++) r = pick(CONTRACT_RESOURCES)
+      used.add(r)
+      items.push({ resource: r, amount: Math.round(rand(15, 45)) })
     }
+    const timeLimit = Math.round(type === 'mega' ? rand(180, 280) : rand(120, 200))
+    const margin = type === 'mega' ? rand(2.0, 2.6) : rand(1.8, 2.3)
+    const value = items.reduce((s, it) => s + it.amount * RESOURCE_VALUE[it.resource], 0)
+    return { id, type, items, reward: Math.round(value * margin), timeLimit, remaining: timeLimit }
   }
 
+  const cfg = SINGLE[type]
   const resource = pick(CONTRACT_RESOURCES)
-  let amount: number
-  let timeLimit: number
-  let margin: number
-  if (type === 'rush') {
-    amount = Math.round(rand(8, 25))
-    timeLimit = Math.round(rand(35, 60))
-    margin = rand(2.3, 3.0)
-  } else if (type === 'bulk') {
-    amount = Math.round(rand(80, 200))
-    timeLimit = Math.round(rand(200, 300))
-    margin = rand(1.5, 1.8)
-  } else {
-    amount = Math.round(rand(15, 60))
-    timeLimit = Math.round(rand(90, 160))
-    margin = rand(1.6, 2.0)
-  }
+  const amount = Math.round(rand(cfg.amt[0], cfg.amt[1]))
+  const timeLimit = Math.round(rand(cfg.time[0], cfg.time[1]))
+  const margin = rand(cfg.margin[0], cfg.margin[1])
   const reward = Math.round(amount * RESOURCE_VALUE[resource] * margin)
   return { id, type, items: [{ resource, amount }], reward, timeLimit, remaining: timeLimit }
 }
@@ -79,7 +88,7 @@ export function normalizeContract(raw: unknown): Contract | null {
   const timeLimit = typeof c.timeLimit === 'number' ? c.timeLimit : 60
   const remaining = typeof c.remaining === 'number' ? c.remaining : timeLimit
   if (Array.isArray(c.items)) {
-    return { id: c.id, type: (c.type as ContractType) ?? 'delivery', items: c.items as Contract['items'], reward, timeLimit, remaining }
+    return { id: c.id, type: (c.type as ContractType) ?? 'delivery', items: c.items as ContractItem[], reward, timeLimit, remaining }
   }
   if (typeof c.resource === 'string' && typeof c.amount === 'number') {
     return {

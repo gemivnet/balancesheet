@@ -82,7 +82,14 @@ export interface FacilityState {
   owned: number
 }
 
-export type ContractType = 'delivery' | 'rush' | 'bulk' | 'supply'
+export type ContractType =
+  | 'delivery'
+  | 'rush'
+  | 'bulk'
+  | 'supply'
+  | 'express'
+  | 'wholesale'
+  | 'mega'
 
 export interface ContractItem {
   resource: ResourceId

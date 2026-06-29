@@ -1,7 +1,19 @@
 <script lang="ts">
-  import { view, downloadSave, importSave, resetGame, setTheme, rerollMap } from '../store/game.svelte'
+  import {
+    view,
+    downloadSave,
+    importSave,
+    resetGame,
+    setTheme,
+    rerollMap,
+    setSeed,
+  } from '../store/game.svelte'
 
   let fileInput: HTMLInputElement
+  let seedInput = $state(view.citySeed)
+  function applySeed() {
+    setSeed(Number(seedInput))
+  }
 
   async function onFile(e: Event) {
     const input = e.target as HTMLInputElement
@@ -37,13 +49,16 @@
     </div>
   {/if}
 
-  <h3>Map</h3>
+  <h3>Map seed</h3>
   <div class="settings-row">
-    <button onclick={rerollMap}>regenerate map look</button>
+    <input class="seed-input" type="number" bind:value={seedInput} aria-label="map seed" />
+    <button onclick={applySeed}>apply</button>
+    <button onclick={rerollMap}>random</button>
   </div>
-
   <p class="hint">
-    ASCII Tycoon saves to this browser. Export a save to back it up or move it. The map look
-    (rivers, districts, building shapes) is cosmetic — "regenerate" rolls a new one.
+    Current seed: <strong>{view.citySeed}</strong>. The same seed always grows the same map look
+    (rivers, districts, building shapes) — paste in a seed to copy a city. (Cosmetic only.)
   </p>
+
+  <p class="hint">ASCII Tycoon saves to this browser. Export a save to back it up or move it.</p>
 </div>

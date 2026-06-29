@@ -598,6 +598,12 @@ export function rerollMap(): void {
   snapshot()
 }
 
+export function setSeed(n: number): void {
+  if (!Number.isFinite(n)) return
+  engine.state.seed = Math.floor(Math.abs(n))
+  snapshot()
+}
+
 export function buildFacility(id: string): void {
   engine.buyFacility(id, 1)
   snapshot()
