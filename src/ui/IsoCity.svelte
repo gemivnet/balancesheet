@@ -129,10 +129,11 @@
     if (t.type === 'water') return { fill: alt ? '#5aa9d6' : '#62afd9', stroke: '#4f9fcf' }
     if (t.type === 'bridge') return { fill: alt ? '#b8946a' : '#ad8a62', stroke: '#8f6f48' }
     if (t.type === 'road') return { fill: alt ? '#d8cba2' : '#cfc198', stroke: '#bdae84' }
-    if (t.type === 'park') return { fill: alt ? '#79b257' : '#82bb60', stroke: '#6aa34c' }
-    if (t.type === 'farm') return { fill: alt ? '#cbaa6a' : '#c2a25f', stroke: '#a98a4e' }
     if (t.owner?.kind === 'forSale') return { fill: '#ffe27a', stroke: '#e0a82e' }
     if (t.building) return { fill: alt ? '#8fb86a' : '#97c074', stroke: '#79a857' }
+    if (t.beach) return { fill: alt ? '#e6d9a8' : '#ddd09c', stroke: '#cbbd86' }
+    if (t.type === 'park') return { fill: alt ? '#79b257' : '#82bb60', stroke: '#6aa34c' }
+    if (t.type === 'farm') return { fill: alt ? '#cbaa6a' : '#c2a25f', stroke: '#a98a4e' }
     return { fill: alt ? '#86bd62' : '#8ec06c', stroke: '#76a958' }
   }
   function drawFurrows(px: number, py: number) {
@@ -161,6 +162,22 @@
     if (!ctx) return
     ctx.fillStyle = '#5b5f66'
     ctx.fillRect(px + (twz * 0.18) * f, py - h - 9 * zoom - thz * 0.1, 3 * zoom, 9 * zoom)
+  }
+  function miniBox(px: number, py: number, baseLift: number, bh: number, f: number, color: string) {
+    const g = diamond(px, py, baseLift, f)
+    const t = diamond(px, py, baseLift + bh, f)
+    poly([g[3], g[2], t[2], t[3]], darken(color, 0.8), E)
+    poly([g[2], g[1], t[1], t[2]], darken(color, 0.62), E)
+    poly(t, color, E)
+  }
+  function smoke(px: number, topY: number) {
+    if (!ctx) return
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath()
+      ctx.arc(px + i * 2 * zoom, topY - i * 5 * zoom, (2.4 + i) * zoom, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(150,150,150,${0.32 - i * 0.09})`
+      ctx.fill()
+    }
   }
   function drawFlag(px: number, topY: number) {
     if (!ctx) return
@@ -208,6 +225,14 @@
       poly([top[3], top[2], apex], darken(b.roof, 0.82), E)
       poly([top[2], top[1], apex], b.roof, E)
     }
+    if (zoom > 0.7) {
+      if (b.detail === 'tower') miniBox(px, py, h, 5 * zoom, f * 0.4, '#717f93')
+      else if (b.detail === 'shop') {
+        const rf = rightFace(px, py, h, f)
+        poly([rf[0], rf[1], lerp(rf[1], rf[2], 0.22), lerp(rf[0], rf[3], 0.22)], '#c0392b', E)
+      }
+      if (b.chimney) smoke(px + (twz * 0.18) * f, py - h - 9 * zoom)
+    }
     if (b.owned && zoom > 0.7) drawFlag(px, buildingTopY(t, py))
   }
 
@@ -240,13 +265,21 @@
       const g = groundFill(t)
       poly(diamond(px, py), g.fill, g.stroke)
       if (t.type === 'farm') drawFurrows(px, py)
+      if (t.type === 'water' && (t.x * 3 + t.y) % 4 === 0)
+        segLine([px - twz * 0.18, py], [px + twz * 0.18, py], 'rgba(255,255,255,0.22)')
     }
     for (const t of sorted) {
       const px = sx(t)
       const py = sy(t)
       if (!vis(px, py)) continue
       if (t.building) drawBuilding(px, py, t)
-      else if (t.tree && zoom > 0.5) drawTree(px, py)
+      else if (t.tree && zoom > 0.5) {
+        if (t.type === 'park') {
+          drawTree(px - twz * 0.16, py + thz * 0.08)
+          drawTree(px + twz * 0.16, py + thz * 0.08)
+          drawTree(px, py - thz * 0.04)
+        } else drawTree(px, py)
+      }
     }
 
     if (hoverKey) {

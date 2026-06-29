@@ -32,6 +32,7 @@ function fbm(seed: number, x: number, y: number, freq: number): number {
 
 export type Zone = 'downtown' | 'commercial' | 'residential' | 'industrial'
 export type RoofStyle = 'hip' | 'flat' | 'spire'
+export type BuildingDetail = 'house' | 'shop' | 'tower' | 'works' | 'civic'
 
 const WALL_LIGHT = ['#e8e0d0', '#ded3bf', '#e3dbc8', '#d8cdb6', '#cfc2a8']
 const WALL: Record<Zone, string[]> = {
@@ -88,6 +89,7 @@ export interface WorldBuilding {
   wall: string
   roof: string
   roofStyle: RoofStyle
+  detail: BuildingDetail
   h: number
   foot: number
   windows: boolean
@@ -100,6 +102,7 @@ export interface WorldTile {
   type: 'water' | 'bridge' | 'road' | 'park' | 'farm' | 'lot'
   building?: WorldBuilding
   tree?: boolean
+  beach?: boolean
   owner?: Owner
   label?: string
 }
@@ -138,10 +141,13 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const flat = zone === 'downtown' || zone === 'industrial'
     const roofStyle: RoofStyle = flat ? 'flat' : hash(seed ^ 0x33, x, y) > 0.9 ? 'spire' : 'hip'
     const foot = Math.min(1, (zone === 'downtown' ? 0.92 : zone === 'industrial' ? 0.86 : 0.72) + hash(seed ^ 0x39, x, y) * 0.18)
+    const detail: BuildingDetail =
+      zone === 'residential' ? 'house' : zone === 'commercial' ? 'shop' : zone === 'downtown' ? 'tower' : 'works'
     return {
       wall: desat(wall, m),
       roof: desat(roof, m),
       roofStyle,
+      detail,
       h,
       foot,
       windows: true,
@@ -198,6 +204,19 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     }
   }
 
+  // beaches: dry land touching water
+  for (const t of tiles) {
+    if (t.type === 'water') continue
+    if (
+      byKey.get(`${t.x + 1},${t.y}`)?.type === 'water' ||
+      byKey.get(`${t.x - 1},${t.y}`)?.type === 'water' ||
+      byKey.get(`${t.x},${t.y + 1}`)?.type === 'water' ||
+      byKey.get(`${t.x},${t.y - 1}`)?.type === 'water'
+    ) {
+      t.beach = true
+    }
+  }
+
   lots.sort((a, b) => a.d - b.d)
   const taken = new Set<string>()
   const at = (x: number, y: number) => byKey.get(`${x},${y}`)!
@@ -214,7 +233,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const def = CIVIC_DEFS[i]
     const t = at(s.x, s.y)
     t.owner = { kind: 'civic', civic: def.id, menu: def.menu, label: def.name }
-    t.building = { wall: '#ece8de', roof: CIVIC_ROOF[def.id] ?? '#888', roofStyle: 'spire', h: 20, foot: 0.9, windows: true, owned: true }
+    t.building = { wall: '#ece8de', roof: CIVIC_ROOF[def.id] ?? '#888', roofStyle: 'spire', detail: 'civic', h: 20, foot: 0.9, windows: true, owned: true }
     t.label = def.name
   })
 
@@ -225,7 +244,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     taken.add(`${lot.x},${lot.y}`)
     const t = at(lot.x, lot.y)
     t.owner = { kind: 'business', businessId: shop.id, label: shop.name }
-    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#caa', roofStyle: 'hip', h: 13, foot: 0.9, windows: true, owned: true }
+    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#caa', roofStyle: 'hip', detail: 'shop', h: 13, foot: 0.9, windows: true, owned: true }
     t.label = shop.name
   })
 
