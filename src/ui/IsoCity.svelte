@@ -7,8 +7,9 @@
   let wrap: HTMLDivElement
   let ctx: CanvasRenderingContext2D | null = null
 
-  const TW = 44
-  const TH = 22
+  const TW = 52
+  const TH = 26
+  const E = 'rgba(0,0,0,0.2)'
 
   let panX = 0
   let panY = 0
@@ -35,22 +36,24 @@
     const n = parseInt(hex.slice(1), 16)
     return `rgb(${Math.round(((n >> 16) & 255) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`
   }
-  function diamond(px: number, py: number, lift = 0): Pt[] {
+  function diamond(px: number, py: number, lift = 0, f = 1): Pt[] {
+    const hw = (twz / 2) * f
+    const hh = (thz / 2) * f
     return [
-      [px, py - thz / 2 - lift],
-      [px + twz / 2, py - lift],
-      [px, py + thz / 2 - lift],
-      [px - twz / 2, py - lift],
+      [px, py - hh - lift],
+      [px + hw, py - lift],
+      [px, py + hh - lift],
+      [px - hw, py - lift],
     ]
   }
-  function leftFace(px: number, py: number, h: number): Pt[] {
-    const g = diamond(px, py)
-    const t = diamond(px, py, h)
+  function leftFace(px: number, py: number, h: number, f: number): Pt[] {
+    const g = diamond(px, py, 0, f)
+    const t = diamond(px, py, h, f)
     return [g[3], g[2], t[2], t[3]]
   }
-  function rightFace(px: number, py: number, h: number): Pt[] {
-    const g = diamond(px, py)
-    const t = diamond(px, py, h)
+  function rightFace(px: number, py: number, h: number, f: number): Pt[] {
+    const g = diamond(px, py, 0, f)
+    const t = diamond(px, py, h, f)
     return [g[2], g[1], t[1], t[2]]
   }
   function poly(pts: Pt[], fill: string | null, stroke: string, w = 1) {
@@ -124,6 +127,7 @@
   function groundFill(t: WorldTile): { fill: string; stroke: string } {
     const alt = (Math.abs(t.x) + Math.abs(t.y)) % 2 === 0
     if (t.type === 'water') return { fill: alt ? '#5aa9d6' : '#62afd9', stroke: '#4f9fcf' }
+    if (t.type === 'bridge') return { fill: alt ? '#b8946a' : '#ad8a62', stroke: '#8f6f48' }
     if (t.type === 'road') return { fill: alt ? '#d8cba2' : '#cfc198', stroke: '#bdae84' }
     if (t.type === 'park') return { fill: alt ? '#79b257' : '#82bb60', stroke: '#6aa34c' }
     if (t.type === 'farm') return { fill: alt ? '#cbaa6a' : '#c2a25f', stroke: '#a98a4e' }
@@ -131,7 +135,10 @@
     if (t.building) return { fill: alt ? '#8fb86a' : '#97c074', stroke: '#79a857' }
     return { fill: alt ? '#86bd62' : '#8ec06c', stroke: '#76a958' }
   }
-
+  function drawFurrows(px: number, py: number) {
+    const d = diamond(px, py)
+    for (const f of [0.3, 0.5, 0.7]) segLine(lerp(d[0], d[1], f), lerp(d[3], d[2], f), 'rgba(90,60,20,0.3)')
+  }
   function drawTree(px: number, py: number) {
     if (!ctx) return
     const r = twz * 0.16
@@ -150,6 +157,11 @@
     for (const f of [0.36, 0.7]) segLine(lerp(a, d, f), lerp(b, c, f), 'rgba(0,0,0,0.16)')
     segLine(lerp(a, b, 0.5), lerp(d, c, 0.5), 'rgba(0,0,0,0.16)')
   }
+  function chimney(px: number, py: number, h: number, f: number) {
+    if (!ctx) return
+    ctx.fillStyle = '#5b5f66'
+    ctx.fillRect(px + (twz * 0.18) * f, py - h - 9 * zoom - thz * 0.1, 3 * zoom, 9 * zoom)
+  }
   function drawFlag(px: number, topY: number) {
     if (!ctx) return
     const ph = 9 * zoom
@@ -167,33 +179,36 @@
     ctx.fillStyle = '#ffce3a'
     ctx.fill()
   }
-  function drawFurrows(px: number, py: number) {
-    const d = diamond(px, py)
-    for (const f of [0.3, 0.5, 0.7]) segLine(lerp(d[0], d[1], f), lerp(d[3], d[2], f), 'rgba(90,60,20,0.3)')
+  function buildingTopY(t: WorldTile, py: number): number {
+    const b = t.building!
+    const h = b.h * zoom
+    if (b.roofStyle === 'flat') return py - h
+    const rh = (b.roofStyle === 'spire' ? thz * 1.3 : thz * 0.5) + 4
+    return py - h - (thz / 2) * b.foot - rh
   }
   function drawBuilding(px: number, py: number, t: WorldTile) {
     if (!ctx || !t.building) return
     const b = t.building
     const h = b.h * zoom
-    poly(leftFace(px, py, h), darken(b.wall, 0.8), 'rgba(0,0,0,0.2)')
-    poly(rightFace(px, py, h), darken(b.wall, 0.62), 'rgba(0,0,0,0.2)')
+    const f = b.foot
+    poly(leftFace(px, py, h, f), darken(b.wall, 0.8), E)
+    poly(rightFace(px, py, h, f), darken(b.wall, 0.62), E)
     if (zoom > 0.7 && h > 12) {
-      windows(leftFace(px, py, h))
-      windows(rightFace(px, py, h))
+      windows(leftFace(px, py, h, f))
+      windows(rightFace(px, py, h, f))
     }
-    const top = diamond(px, py, h)
-    let flagY = py - h
-    if (b.roofKind === 'flat') {
-      poly(top, b.roof, 'rgba(0,0,0,0.18)')
+    const top = diamond(px, py, h, f)
+    if (b.roofStyle === 'flat') {
+      poly(top, b.roof, E)
+      if (b.chimney) chimney(px, py, h, f)
     } else {
-      poly(top, darken(b.wall, 0.9), 'rgba(0,0,0,0.18)')
-      const rh = thz * 0.55 + 4
-      const apex: Pt = [px, py - h - thz / 2 - rh]
-      poly([top[3], top[2], apex], darken(b.roof, 0.82), 'rgba(0,0,0,0.2)')
-      poly([top[2], top[1], apex], b.roof, 'rgba(0,0,0,0.2)')
-      flagY = apex[1]
+      poly(top, darken(b.wall, 0.9), E)
+      const rh = (b.roofStyle === 'spire' ? thz * 1.3 : thz * 0.5) + 4
+      const apex: Pt = [px, py - h - (thz / 2) * f - rh]
+      poly([top[3], top[2], apex], darken(b.roof, 0.82), E)
+      poly([top[2], top[1], apex], b.roof, E)
     }
-    if (b.owned && zoom > 0.7) drawFlag(px, flagY)
+    if (b.owned && zoom > 0.7) drawFlag(px, buildingTopY(t, py))
   }
 
   function draw() {
@@ -216,7 +231,7 @@
     const { cx, cy } = centerOf(W, Ht)
     const sx = (t: WorldTile) => cx + (t.x - t.y) * (twz / 2)
     const sy = (t: WorldTile) => cy + (t.x + t.y) * (thz / 2)
-    const vis = (px: number, py: number) => px > -twz && px < W + twz && py > -120 && py < Ht + thz
+    const vis = (px: number, py: number) => px > -twz && px < W + twz && py > -150 && py < Ht + thz
 
     for (const t of sorted) {
       const px = sx(t)
@@ -239,12 +254,12 @@
       if (t) {
         const px = sx(t)
         const py = sy(t)
-        const top = t.building ? diamond(px, py, t.building.h * zoom) : diamond(px, py)
+        const top = t.building ? diamond(px, py, t.building.h * zoom, t.building.foot) : diamond(px, py)
         poly(top, 'rgba(255,214,0,0.4)', '#ffce00', 2.5)
       }
     }
 
-    if (zoom > 0.65) {
+    if (zoom > 0.6) {
       ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
       ctx.textAlign = 'center'
       for (const t of sorted) {
@@ -252,7 +267,7 @@
         const px = sx(t)
         const py = sy(t)
         if (!vis(px, py)) continue
-        const ly = py - (t.building ? t.building.h * zoom : 0) - 9
+        const ly = (t.building ? buildingTopY(t, py) : py) - 11
         const w = ctx.measureText(t.label).width
         ctx.fillStyle = 'rgba(0,0,0,0.78)'
         ctx.fillRect(px - w / 2 - 4, ly - 9, w + 8, 14)
@@ -273,10 +288,11 @@
       const py = cy + (t.x + t.y) * (thz / 2)
       if (t.building) {
         const h = t.building.h * zoom
+        const f = t.building.foot
         if (
-          pointInPoly(mx, my, diamond(px, py, h)) ||
-          pointInPoly(mx, my, leftFace(px, py, h)) ||
-          pointInPoly(mx, my, rightFace(px, py, h))
+          pointInPoly(mx, my, diamond(px, py, h, f)) ||
+          pointInPoly(mx, my, leftFace(px, py, h, f)) ||
+          pointInPoly(mx, my, rightFace(px, py, h, f))
         )
           return t
       } else if (pointInPoly(mx, my, diamond(px, py))) {
@@ -372,7 +388,7 @@
     const uy = my - o0.cy
     const fx = (ux / (twz / 2) + uy / (thz / 2)) / 2
     const fy = (uy / (thz / 2) - ux / (twz / 2)) / 2
-    zoom = Math.min(2.2, Math.max(0.4, zoom * Math.exp(-e.deltaY * 0.0015)))
+    zoom = Math.min(2.4, Math.max(0.35, zoom * Math.exp(-e.deltaY * 0.0015)))
     twz = TW * zoom
     thz = TH * zoom
     const a = autoCenter(W, Ht)
@@ -381,27 +397,42 @@
     draw()
   }
   function zoomBy(f: number) {
-    zoom = Math.min(2.2, Math.max(0.4, zoom * f))
+    zoom = Math.min(2.4, Math.max(0.35, zoom * f))
     draw()
   }
-  function recenter() {
+  function fitView() {
+    if (!wrap) return
+    rebuildWorld()
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const t of world.tiles) {
+      const sx = (t.x - t.y) * (TW / 2)
+      const sy = (t.x + t.y) * (TH / 2)
+      if (sx < minX) minX = sx
+      if (sx > maxX) maxX = sx
+      if (sy < minY) minY = sy
+      if (sy > maxY) maxY = sy
+    }
+    const wW = maxX - minX + TW
+    const wH = maxY - minY + TH + 90
+    zoom = Math.min(2.4, Math.max(0.35, Math.min(wrap.clientWidth / wW, wrap.clientHeight / wH) * 0.95))
     panX = 0
     panY = 0
-    zoom = 1
     draw()
   }
 
   onMount(() => {
     ctx = canvas.getContext('2d')
-    draw()
+    rebuildWorld()
+    fitView()
     const ro = new ResizeObserver(() => draw())
     ro.observe(wrap)
     return () => ro.disconnect()
   })
 
   $effect(() => {
-    // depend only on the (stable) world inputs; untrack the draw so its internal
-    // reads of `view` don't make this re-run every snapshot.
     view.citySeed
     view.city.rentalCount
     view.city.density
@@ -427,7 +458,7 @@
   </div>
   <div class="city-controls">
     <button class="mini" onclick={() => zoomBy(1 / 1.25)} aria-label="zoom out">−</button>
-    <button class="mini" onclick={recenter}>recenter</button>
+    <button class="mini" onclick={fitView}>recenter</button>
     <button class="mini" onclick={() => zoomBy(1.25)} aria-label="zoom in">+</button>
   </div>
 </div>

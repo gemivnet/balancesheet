@@ -1,11 +1,10 @@
 // Procedural, seeded, organic town generator (cosmetic + placement).
 //
-// Produces a World of tiles: an irregular landmass with coast/rivers, a curvy road
-// network, zoned districts (downtown / commercial / residential / industrial),
-// parks + farm plots, ambient buildings filling the town, and the player's OWNED
-// buildings (civic, shops, rentals, the for-sale lot) placed into sensible zones.
-// Buildings carry walls + a pitched-or-flat roof so the town reads like a real place.
-// Deterministic from the seed.
+// Produces a World of tiles: an irregular landmass with coast/rivers + bridges, a
+// curvy road network, zoned districts, parks + farm plots, ambient buildings filling
+// the town, and the player's OWNED buildings placed by zone. Buildings carry walls,
+// a roof style (hip / flat / spire), a footprint scale and optional chimney so the
+// town reads like a real place. Deterministic from the seed.
 
 import { CIVIC_DEFS } from '../engine/city'
 
@@ -32,7 +31,7 @@ function fbm(seed: number, x: number, y: number, freq: number): number {
 }
 
 export type Zone = 'downtown' | 'commercial' | 'residential' | 'industrial'
-export type RoofKind = 'gable' | 'flat'
+export type RoofStyle = 'hip' | 'flat' | 'spire'
 
 const WALL_LIGHT = ['#e8e0d0', '#ded3bf', '#e3dbc8', '#d8cdb6', '#cfc2a8']
 const WALL: Record<Zone, string[]> = {
@@ -52,12 +51,6 @@ const ZONE_H: Record<Zone, [number, number]> = {
   commercial: [10, 15],
   downtown: [16, 28],
   industrial: [7, 10],
-}
-const ROOFKIND: Record<Zone, RoofKind> = {
-  residential: 'gable',
-  commercial: 'gable',
-  downtown: 'flat',
-  industrial: 'flat',
 }
 const BIZ_ROOF: Record<string, string> = { L: '#e0b020', C: '#9c6b4a', R: '#5f7f9c' }
 const CIVIC_ROOF: Record<string, string> = {
@@ -94,15 +87,17 @@ export interface Owner {
 export interface WorldBuilding {
   wall: string
   roof: string
-  roofKind: RoofKind
+  roofStyle: RoofStyle
   h: number
+  foot: number
   windows: boolean
+  chimney?: boolean
   owned?: boolean
 }
 export interface WorldTile {
   x: number
   y: number
-  type: 'water' | 'road' | 'park' | 'farm' | 'lot'
+  type: 'water' | 'bridge' | 'road' | 'park' | 'farm' | 'lot'
   building?: WorldBuilding
   tree?: boolean
   owner?: Owner
@@ -140,7 +135,19 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const [h0, h1] = ZONE_H[zone]
     const h = hOverride ?? h0 + ((hash(seed ^ 0x22, x, y) * (h1 - h0)) | 0)
     const m = owned ? 0 : 0.24
-    return { wall: desat(wall, m), roof: desat(roof, m), roofKind: ROOFKIND[zone], h, windows: true, owned }
+    const flat = zone === 'downtown' || zone === 'industrial'
+    const roofStyle: RoofStyle = flat ? 'flat' : hash(seed ^ 0x33, x, y) > 0.9 ? 'spire' : 'hip'
+    const foot = Math.min(1, (zone === 'downtown' ? 0.92 : zone === 'industrial' ? 0.86 : 0.72) + hash(seed ^ 0x39, x, y) * 0.18)
+    return {
+      wall: desat(wall, m),
+      roof: desat(roof, m),
+      roofStyle,
+      h,
+      foot,
+      windows: true,
+      chimney: zone === 'industrial' && hash(seed ^ 0x37, x, y) > 0.5,
+      owned,
+    }
   }
 
   const tiles: WorldTile[] = []
@@ -179,11 +186,22 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     }
   }
 
+  // bridges: a water tile with road on opposite sides carries the road across
+  for (const t of tiles) {
+    if (t.type !== 'water') continue
+    const road = (x: number, y: number) => {
+      const n = byKey.get(`${x},${y}`)
+      return n?.type === 'road' || n?.type === 'bridge'
+    }
+    if ((road(t.x - 1, t.y) && road(t.x + 1, t.y)) || (road(t.x, t.y - 1) && road(t.x, t.y + 1))) {
+      t.type = 'bridge'
+    }
+  }
+
   lots.sort((a, b) => a.d - b.d)
   const taken = new Set<string>()
   const at = (x: number, y: number) => byKey.get(`${x},${y}`)!
 
-  // civic: closest-to-centre lots, spread apart -> landmarks
   const spots: { x: number; y: number }[] = []
   for (const lot of lots) {
     if (spots.length >= CIVIC_DEFS.length) break
@@ -196,11 +214,10 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const def = CIVIC_DEFS[i]
     const t = at(s.x, s.y)
     t.owner = { kind: 'civic', civic: def.id, menu: def.menu, label: def.name }
-    t.building = { wall: '#e8e4da', roof: CIVIC_ROOF[def.id] ?? '#888', roofKind: 'flat', h: 20, windows: true, owned: true }
+    t.building = { wall: '#ece8de', roof: CIVIC_ROOF[def.id] ?? '#888', roofStyle: 'spire', h: 20, foot: 0.9, windows: true, owned: true }
     t.label = def.name
   })
 
-  // shops: nearest non-industrial lots
   const bizLots = lots.filter((l) => !taken.has(`${l.x},${l.y}`) && l.zone !== 'industrial')
   shops.forEach((shop, i) => {
     const lot = bizLots[i]
@@ -208,11 +225,10 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     taken.add(`${lot.x},${lot.y}`)
     const t = at(lot.x, lot.y)
     t.owner = { kind: 'business', businessId: shop.id, label: shop.name }
-    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#ca8', roofKind: 'gable', h: 13, windows: true, owned: true }
+    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#caa', roofStyle: 'hip', h: 13, foot: 0.9, windows: true, owned: true }
     t.label = shop.name
   })
 
-  // rentals: residential lots nearest first; the next free one is for sale
   const resiLots = lots.filter((l) => !taken.has(`${l.x},${l.y}`) && l.zone === 'residential')
   let placed = 0
   for (const lot of resiLots) {
@@ -229,7 +245,6 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     }
   }
 
-  // ambient buildings fill the rest of the town (with some open/green lots)
   for (const lot of lots) {
     if (taken.has(`${lot.x},${lot.y}`)) continue
     const t = at(lot.x, lot.y)
