@@ -1,23 +1,14 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { view, setActive, openMenu } from '../store/game.svelte'
-  import type { CityCell } from '../store/game.svelte'
-  import { makeCity, type CityGen } from '../render/citygen'
+  import { makeWorld, type World, type WorldTile, type Shop } from '../render/worldgen'
 
   let canvas: HTMLCanvasElement
   let wrap: HTMLDivElement
   let ctx: CanvasRenderingContext2D | null = null
 
-  const TW = 48
-  const TH = 24
-  const DENS = 'nAHM#@'
-  const CIVIC_COLOR: Record<string, string> = {
-    townhall: '#5c7cfa',
-    realtor: '#15aabf',
-    hq: '#9c36b5',
-    factory: '#f08c2e',
-    bank: '#37b24d',
-  }
+  const TW = 44
+  const TH = 22
 
   let panX = 0
   let panY = 0
@@ -34,10 +25,9 @@
   let panStartX = 0
   let panStartY = 0
 
-  let frontOrder: CityCell[] = []
-  let cityGen: CityGen = makeCity(0)
-  let seedUsed = -1
-  let bbox = { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+  let world: World = makeWorld(0, [], 0, 0)
+  let worldSig = ''
+  let frontOrder: WorldTile[] = []
 
   type Pt = [number, number]
 
@@ -45,28 +35,6 @@
     const n = parseInt(hex.slice(1), 16)
     return `rgb(${Math.round(((n >> 16) & 255) * f)},${Math.round(((n >> 8) & 255) * f)},${Math.round((n & 255) * f)})`
   }
-  function box(base: string, h: number) {
-    return { top: base, left: darken(base, 0.78), right: darken(base, 0.6), h }
-  }
-  function building(cell: CityCell) {
-    if (cell.kind === 'business') {
-      const palette: Record<string, string> = { L: '#f6c945', C: '#9c6b4a', R: '#6d8aa6' }
-      return box(palette[cell.glyph] ?? '#5bb6a6', 16)
-    }
-    if (cell.kind === 'rental') {
-      const den = Math.max(0, DENS.indexOf(cell.glyph))
-      const b = cityGen.block(cell.x, cell.y, den)
-      return box(b.base, b.h)
-    }
-    if (cell.kind === 'civic') return box(CIVIC_COLOR[cell.civic ?? ''] ?? '#888', 20)
-    return null
-  }
-
-  const odd = (n: number) => Math.abs(n) % 2 === 1
-  const inCity = (x: number, y: number) =>
-    x >= bbox.minX && x <= bbox.maxX && y >= bbox.minY && y <= bbox.maxY
-  const isRoad = (c: CityCell) => c.kind === 'empty' && inCity(c.x, c.y) && (odd(c.x) || odd(c.y))
-
   function diamond(px: number, py: number, lift = 0): Pt[] {
     return [
       [px, py - thz / 2 - lift],
@@ -102,7 +70,7 @@
   function lerp(a: Pt, b: Pt, t: number): Pt {
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
   }
-  function seg(a: Pt, b: Pt, color: string) {
+  function segLine(a: Pt, b: Pt, color: string) {
     if (!ctx) return
     ctx.beginPath()
     ctx.moveTo(a[0], a[1])
@@ -110,11 +78,6 @@
     ctx.strokeStyle = color
     ctx.lineWidth = 1
     ctx.stroke()
-  }
-  function windows(face: Pt[]) {
-    const [a, b, c, d] = face // a ground-out, b ground-bottom, c top-bottom, d top-out
-    for (const f of [0.36, 0.7]) seg(lerp(a, d, f), lerp(b, c, f), 'rgba(0,0,0,0.16)')
-    seg(lerp(a, b, 0.5), lerp(d, c, 0.5), 'rgba(0,0,0,0.16)')
   }
   function pointInPoly(x: number, y: number, p: Pt[]): boolean {
     let inside = false
@@ -128,15 +91,24 @@
     return inside
   }
 
+  function rebuildWorld() {
+    const shops: Shop[] = view.businesses
+      .filter((b) => b.owned > 0)
+      .map((b) => ({ id: b.id, glyph: b.glyph, name: b.name }))
+    const sig = `${view.citySeed}|${shops.map((s) => s.id).join(',')}|${view.city.rentalCount}|${view.city.density}`
+    if (sig === worldSig) return
+    worldSig = sig
+    world = makeWorld(view.citySeed, shops, view.city.rentalCount, view.city.density)
+  }
+
   function autoCenter(W: number, Ht: number) {
-    const cells = view.city.cells
     let minSX = Infinity
     let maxSX = -Infinity
     let minSY = Infinity
     let maxSY = -Infinity
-    for (const c of cells) {
-      const sx = (c.x - c.y) * (twz / 2)
-      const sy = (c.x + c.y) * (thz / 2)
+    for (const t of world.tiles) {
+      const sx = (t.x - t.y) * (twz / 2)
+      const sy = (t.x + t.y) * (thz / 2)
       if (sx < minSX) minSX = sx
       if (sx > maxSX) maxSX = sx
       if (sy < minSY) minSY = sy
@@ -149,63 +121,84 @@
     return { cx: a.ax + panX, cy: a.ay + panY }
   }
 
-  function drawGround(px: number, py: number, c: CityCell) {
-    let fill: string
-    let stroke: string
-    if (c.kind === 'business' || c.kind === 'rental' || c.kind === 'civic') {
-      fill = '#cbc8bf'
-      stroke = '#b1aea4'
-    } else if (c.kind === 'forSale') {
-      fill = '#ffe27a'
-      stroke = '#e0a82e'
-    } else {
-      const water = cityGen.isWater(c.x, c.y)
-      const road = inCity(c.x, c.y) && (odd(c.x) || odd(c.y))
-      if (road && water) {
-        fill = '#9c7b4f' // bridge
-        stroke = '#7d6240'
-      } else if (road) {
-        fill = '#6f747c' // asphalt
-        stroke = '#5c616a'
-      } else {
-        fill = cityGen.groundColor(c.x, c.y)
-        stroke = darken(fill, 0.85)
-      }
-    }
-    poly(diamond(px, py), fill, stroke)
+  function groundFill(t: WorldTile): { fill: string; stroke: string } {
+    const alt = (Math.abs(t.x) + Math.abs(t.y)) % 2 === 0
+    if (t.type === 'water') return { fill: alt ? '#5aa9d6' : '#62afd9', stroke: '#4f9fcf' }
+    if (t.type === 'road') return { fill: alt ? '#d8cba2' : '#cfc198', stroke: '#bdae84' }
+    if (t.type === 'park') return { fill: alt ? '#79b257' : '#82bb60', stroke: '#6aa34c' }
+    if (t.type === 'farm') return { fill: alt ? '#cbaa6a' : '#c2a25f', stroke: '#a98a4e' }
+    if (t.owner?.kind === 'forSale') return { fill: '#ffe27a', stroke: '#e0a82e' }
+    if (t.building) return { fill: alt ? '#8fb86a' : '#97c074', stroke: '#79a857' }
+    return { fill: alt ? '#86bd62' : '#8ec06c', stroke: '#76a958' }
   }
+
   function drawTree(px: number, py: number) {
     if (!ctx) return
     const r = twz * 0.16
     ctx.fillStyle = '#6b4f2a'
     ctx.fillRect(px - 1.5, py - r * 0.3, 3, r * 0.7)
     ctx.beginPath()
-    ctx.arc(px, py - r * 0.6, r, 0, Math.PI * 2)
+    ctx.arc(px, py - r * 0.7, r, 0, Math.PI * 2)
     ctx.fillStyle = '#4f8f43'
     ctx.fill()
     ctx.strokeStyle = '#3c7a33'
     ctx.lineWidth = 1
     ctx.stroke()
   }
-  function drawBox(px: number, py: number, b: { top: string; left: string; right: string; h: number }) {
+  function windows(face: Pt[]) {
+    const [a, b, c, d] = face
+    for (const f of [0.36, 0.7]) segLine(lerp(a, d, f), lerp(b, c, f), 'rgba(0,0,0,0.16)')
+    segLine(lerp(a, b, 0.5), lerp(d, c, 0.5), 'rgba(0,0,0,0.16)')
+  }
+  function drawFlag(px: number, topY: number) {
+    if (!ctx) return
+    const ph = 9 * zoom
+    ctx.strokeStyle = '#3a3a3a'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(px, topY)
+    ctx.lineTo(px, topY - ph)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(px, topY - ph)
+    ctx.lineTo(px + 7 * zoom, topY - ph + 3 * zoom)
+    ctx.lineTo(px, topY - ph + 6 * zoom)
+    ctx.closePath()
+    ctx.fillStyle = '#ffce3a'
+    ctx.fill()
+  }
+  function drawFurrows(px: number, py: number) {
+    const d = diamond(px, py)
+    for (const f of [0.3, 0.5, 0.7]) segLine(lerp(d[0], d[1], f), lerp(d[3], d[2], f), 'rgba(90,60,20,0.3)')
+  }
+  function drawBuilding(px: number, py: number, t: WorldTile) {
+    if (!ctx || !t.building) return
+    const b = t.building
     const h = b.h * zoom
-    const lf = leftFace(px, py, h)
-    const rf = rightFace(px, py, h)
-    poly(lf, b.left, 'rgba(0,0,0,0.2)')
-    poly(rf, b.right, 'rgba(0,0,0,0.2)')
-    poly(diamond(px, py, h), b.top, 'rgba(0,0,0,0.16)')
-    if (zoom > 0.55 && h > 13) {
-      windows(lf)
-      windows(rf)
+    poly(leftFace(px, py, h), darken(b.wall, 0.8), 'rgba(0,0,0,0.2)')
+    poly(rightFace(px, py, h), darken(b.wall, 0.62), 'rgba(0,0,0,0.2)')
+    if (zoom > 0.7 && h > 12) {
+      windows(leftFace(px, py, h))
+      windows(rightFace(px, py, h))
     }
+    const top = diamond(px, py, h)
+    let flagY = py - h
+    if (b.roofKind === 'flat') {
+      poly(top, b.roof, 'rgba(0,0,0,0.18)')
+    } else {
+      poly(top, darken(b.wall, 0.9), 'rgba(0,0,0,0.18)')
+      const rh = thz * 0.55 + 4
+      const apex: Pt = [px, py - h - thz / 2 - rh]
+      poly([top[3], top[2], apex], darken(b.roof, 0.82), 'rgba(0,0,0,0.2)')
+      poly([top[2], top[1], apex], b.roof, 'rgba(0,0,0,0.2)')
+      flagY = apex[1]
+    }
+    if (b.owned && zoom > 0.7) drawFlag(px, flagY)
   }
 
   function draw() {
     if (!ctx || !canvas || !wrap) return
-    if (view.citySeed !== seedUsed) {
-      cityGen = makeCity(view.citySeed)
-      seedUsed = view.citySeed
-    }
+    rebuildWorld()
     twz = TW * zoom
     thz = TH * zoom
     const dpr = window.devicePixelRatio || 1
@@ -218,101 +211,98 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, W, Ht)
 
-    const cells = view.city.cells
-    if (cells.length === 0) return
-
-    bbox = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-    for (const c of cells) {
-      if (c.kind === 'empty') continue
-      if (c.x < bbox.minX) bbox.minX = c.x
-      if (c.x > bbox.maxX) bbox.maxX = c.x
-      if (c.y < bbox.minY) bbox.minY = c.y
-      if (c.y > bbox.maxY) bbox.maxY = c.y
-    }
-
-    const sorted = [...cells].sort((a, b) => a.x + a.y - (b.x + b.y))
+    const sorted = [...world.tiles].sort((a, b) => a.x + a.y - (b.x + b.y))
     frontOrder = sorted.slice().reverse()
     const { cx, cy } = centerOf(W, Ht)
-    const sx = (c: CityCell) => cx + (c.x - c.y) * (twz / 2)
-    const sy = (c: CityCell) => cy + (c.x + c.y) * (thz / 2)
+    const sx = (t: WorldTile) => cx + (t.x - t.y) * (twz / 2)
+    const sy = (t: WorldTile) => cy + (t.x + t.y) * (thz / 2)
+    const vis = (px: number, py: number) => px > -twz && px < W + twz && py > -120 && py < Ht + thz
 
-    for (const c of sorted) drawGround(sx(c), sy(c), c)
-    for (const c of sorted) {
-      const b = building(c)
-      if (b) drawBox(sx(c), sy(c), b)
-      else if (
-        zoom > 0.55 &&
-        c.kind === 'empty' &&
-        !isRoad(c) &&
-        !cityGen.isWater(c.x, c.y) &&
-        cityGen.treeAt(c.x, c.y)
-      ) {
-        drawTree(sx(c), sy(c))
-      }
+    for (const t of sorted) {
+      const px = sx(t)
+      const py = sy(t)
+      if (!vis(px, py)) continue
+      const g = groundFill(t)
+      poly(diamond(px, py), g.fill, g.stroke)
+      if (t.type === 'farm') drawFurrows(px, py)
+    }
+    for (const t of sorted) {
+      const px = sx(t)
+      const py = sy(t)
+      if (!vis(px, py)) continue
+      if (t.building) drawBuilding(px, py, t)
+      else if (t.tree && zoom > 0.5) drawTree(px, py)
     }
 
     if (hoverKey) {
-      const c = cells.find((x) => x.key === hoverKey)
-      if (c) {
-        const b = building(c)
-        const top = b ? diamond(sx(c), sy(c), b.h * zoom) : diamond(sx(c), sy(c))
+      const t = world.byKey.get(hoverKey)
+      if (t) {
+        const px = sx(t)
+        const py = sy(t)
+        const top = t.building ? diamond(px, py, t.building.h * zoom) : diamond(px, py)
         poly(top, 'rgba(255,214,0,0.4)', '#ffce00', 2.5)
       }
     }
 
-    ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
-    ctx.textAlign = 'center'
-    for (const c of sorted) {
-      if (c.kind !== 'civic') continue
-      const lx = sx(c)
-      const ly = sy(c) - 20 * zoom - 9
-      const w = ctx.measureText(c.label).width
-      ctx.fillStyle = 'rgba(0,0,0,0.78)'
-      ctx.fillRect(lx - w / 2 - 4, ly - 9, w + 8, 14)
-      ctx.fillStyle = '#fff'
-      ctx.fillText(c.label, lx, ly + 1)
+    if (zoom > 0.65) {
+      ctx.font = 'bold 10px ui-monospace, Menlo, monospace'
+      ctx.textAlign = 'center'
+      for (const t of sorted) {
+        if (!t.label) continue
+        const px = sx(t)
+        const py = sy(t)
+        if (!vis(px, py)) continue
+        const ly = py - (t.building ? t.building.h * zoom : 0) - 9
+        const w = ctx.measureText(t.label).width
+        ctx.fillStyle = 'rgba(0,0,0,0.78)'
+        ctx.fillRect(px - w / 2 - 4, ly - 9, w + 8, 14)
+        ctx.fillStyle = '#fff'
+        ctx.fillText(t.label, px, ly + 1)
+      }
     }
   }
 
-  function pick(clientX: number, clientY: number): CityCell | null {
+  function pick(clientX: number, clientY: number): WorldTile | null {
     if (!canvas) return null
     const rect = canvas.getBoundingClientRect()
     const mx = clientX - rect.left
     const my = clientY - rect.top
     const { cx, cy } = centerOf(wrap.clientWidth, wrap.clientHeight)
-    for (const c of frontOrder) {
-      const px = cx + (c.x - c.y) * (twz / 2)
-      const py = cy + (c.x + c.y) * (thz / 2)
-      const b = building(c)
-      if (b) {
-        const h = b.h * zoom
+    for (const t of frontOrder) {
+      const px = cx + (t.x - t.y) * (twz / 2)
+      const py = cy + (t.x + t.y) * (thz / 2)
+      if (t.building) {
+        const h = t.building.h * zoom
         if (
           pointInPoly(mx, my, diamond(px, py, h)) ||
           pointInPoly(mx, my, leftFace(px, py, h)) ||
           pointInPoly(mx, my, rightFace(px, py, h))
         )
-          return c
+          return t
       } else if (pointInPoly(mx, my, diamond(px, py))) {
-        return c
+        return t
       }
     }
     return null
   }
 
-  function tipText(c: CityCell): string {
-    if (c.kind === 'business') return `${c.label} · click to manage`
-    if (c.kind === 'rental') return 'Rental property · real estate'
-    if (c.kind === 'forSale') return 'Lot for sale · buy property'
-    if (c.kind === 'civic') return `${c.label} · click to open`
-    return ''
+  function tipText(t: WorldTile): string | null {
+    if (!t.owner) return null
+    if (t.owner.kind === 'business') return `${t.owner.label} · click to manage`
+    if (t.owner.kind === 'rental') return 'Rental property · real estate'
+    if (t.owner.kind === 'forSale') return 'Lot for sale · buy property'
+    if (t.owner.kind === 'civic') return `${t.owner.label} · click to open`
+    return null
   }
-  function onTile(c: CityCell) {
-    if (c.kind === 'business' && c.businessId) {
-      setActive(c.businessId)
+  function onTile(t: WorldTile) {
+    const o = t.owner
+    if (!o) return
+    if (o.kind === 'business' && o.businessId) {
+      setActive(o.businessId)
       openMenu('ops')
-    } else if (c.kind === 'civic' && c.menu) {
-      openMenu(c.menu)
-    } else if (c.kind === 'rental' || c.kind === 'forSale') {
+    } else if (o.kind === 'civic' && o.menu) {
+      openMenu(o.menu)
+    } else if (o.kind === 'rental' || o.kind === 'forSale') {
       openMenu('realestate')
     }
   }
@@ -336,25 +326,26 @@
       draw()
       return
     }
-    const c = pick(e.clientX, e.clientY)
-    const key = c && c.kind !== 'empty' ? c.key : null
+    const t = pick(e.clientX, e.clientY)
+    const text = t ? tipText(t) : null
     const rect = wrap.getBoundingClientRect()
-    if (c && key) {
-      tip = { show: true, x: e.clientX - rect.left, y: e.clientY - rect.top, text: tipText(c) }
+    if (t && text) {
+      tip = { show: true, x: e.clientX - rect.left, y: e.clientY - rect.top, text }
       canvas.style.cursor = 'pointer'
     } else {
       if (tip.show) tip = { ...tip, show: false }
       canvas.style.cursor = 'grab'
     }
-    if (key !== hoverKey) {
-      hoverKey = key
+    const hk = t && text ? `${t.x},${t.y}` : null
+    if (hk !== hoverKey) {
+      hoverKey = hk
       draw()
     }
   }
   function up(e: PointerEvent) {
     if (dragging && !moved) {
-      const c = pick(e.clientX, e.clientY)
-      if (c && c.kind !== 'empty') onTile(c)
+      const t = pick(e.clientX, e.clientY)
+      if (t) onTile(t)
     }
     dragging = false
     canvas.style.cursor = hoverKey ? 'pointer' : 'grab'
@@ -381,7 +372,7 @@
     const uy = my - o0.cy
     const fx = (ux / (twz / 2) + uy / (thz / 2)) / 2
     const fy = (uy / (thz / 2) - ux / (twz / 2)) / 2
-    zoom = Math.min(2.4, Math.max(0.4, zoom * Math.exp(-e.deltaY * 0.0015)))
+    zoom = Math.min(2.2, Math.max(0.4, zoom * Math.exp(-e.deltaY * 0.0015)))
     twz = TW * zoom
     thz = TH * zoom
     const a = autoCenter(W, Ht)
@@ -390,7 +381,7 @@
     draw()
   }
   function zoomBy(f: number) {
-    zoom = Math.min(2.4, Math.max(0.4, zoom * f))
+    zoom = Math.min(2.2, Math.max(0.4, zoom * f))
     draw()
   }
   function recenter() {
@@ -409,9 +400,13 @@
   })
 
   $effect(() => {
-    view.city.cells
+    // depend only on the (stable) world inputs; untrack the draw so its internal
+    // reads of `view` don't make this re-run every snapshot.
     view.citySeed
-    draw()
+    view.city.rentalCount
+    view.city.density
+    view.city.shopsKey
+    untrack(() => draw())
   })
 </script>
 

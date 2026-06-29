@@ -228,6 +228,8 @@ export const view = $state({
     rentText: '$0.00/s',
     rentalCostText: '$0.00',
     canBuyRental: false,
+    density: 0,
+    shopsKey: '',
     densityName: 'Low-density',
     densityCostText: '$0.00',
     canBuyDensity: false,
@@ -335,6 +337,7 @@ function snapshot(): void {
   view.city.tierName = tier.name
   view.city.buildingCount = total
   view.city.rentalCount = s.rentals
+  view.city.density = s.densityLevel
   view.city.rentText = formatRate(engine.rentPerSec(), ab)
   const rentalCost = engine.rentalCost()
   view.city.rentalCostText = formatMoney(rentalCost, ab)
@@ -358,6 +361,7 @@ function snapshot(): void {
 
   // Rebuild the (clickable) grid only when its structure actually changes.
   const started = BUSINESS_DEFS.filter((b) => s.businesses[b.id].owned > 0)
+  view.city.shopsKey = started.map((b) => b.id).join(',')
   const sig = `${started.map((b) => b.id).join(',')}|${s.rentals}|${tier.index}|${s.densityLevel}`
   if (sig !== lastCitySig) {
     lastCitySig = sig
