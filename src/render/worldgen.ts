@@ -31,7 +31,7 @@ function fbm(seed: number, x: number, y: number, freq: number): number {
 }
 
 export type Zone = 'downtown' | 'commercial' | 'residential' | 'industrial'
-export type RoofStyle = 'hip' | 'flat' | 'spire'
+export type RoofStyle = 'gable' | 'flat'
 export type BuildingDetail = 'house' | 'shop' | 'tower' | 'works' | 'civic'
 
 const WALL_LIGHT = ['#e8e0d0', '#ded3bf', '#e3dbc8', '#d8cdb6', '#cfc2a8']
@@ -48,10 +48,10 @@ const ROOF: Record<Zone, string[]> = {
   industrial: ['#8d949b', '#9aa0a6', '#7c828a'],
 }
 const ZONE_H: Record<Zone, [number, number]> = {
-  residential: [8, 13],
-  commercial: [10, 15],
-  downtown: [16, 28],
-  industrial: [7, 10],
+  residential: [13, 20],
+  commercial: [16, 24],
+  downtown: [26, 44],
+  industrial: [11, 16],
 }
 const BIZ_ROOF: Record<string, string> = { L: '#e0b020', C: '#9c6b4a', R: '#5f7f9c' }
 const CIVIC_ROOF: Record<string, string> = {
@@ -125,7 +125,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
   const riverBand = (x: number, y: number) => Math.abs(fbm(seed ^ 0x7, x, y, 0.05) - 0.5) < 0.028
   const band = (v: number) => Math.abs(((v * 5) % 1) - 0.5) < 0.085
   const roadAt = (x: number, y: number) => band(fbm(seed ^ 0x3, x, y, 0.115)) || band(fbm(seed ^ 0x9, x, y, 0.115))
-  const parkAt = (x: number, y: number) => fbm(seed ^ 0xb, x, y, 0.14) > 0.84
+  const parkAt = (x: number, y: number) => fbm(seed ^ 0xb, x, y, 0.14) > 0.88
   const zoneAt = (x: number, y: number): Zone => {
     if (Math.hypot(x, y) / R < 0.22) return 'downtown'
     const z = fbm(seed ^ 0x5, x, y, 0.045)
@@ -139,8 +139,8 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const h = hOverride ?? h0 + ((hash(seed ^ 0x22, x, y) * (h1 - h0)) | 0)
     const m = owned ? 0 : 0.24
     const flat = zone === 'downtown' || zone === 'industrial'
-    const roofStyle: RoofStyle = flat ? 'flat' : hash(seed ^ 0x33, x, y) > 0.9 ? 'spire' : 'hip'
-    const foot = Math.min(1, (zone === 'downtown' ? 0.92 : zone === 'industrial' ? 0.86 : 0.72) + hash(seed ^ 0x39, x, y) * 0.18)
+    const roofStyle: RoofStyle = flat ? 'flat' : 'gable'
+    const foot = Math.min(1, (zone === 'downtown' ? 0.92 : zone === 'industrial' ? 0.86 : 0.8) + hash(seed ^ 0x39, x, y) * 0.16)
     const detail: BuildingDetail =
       zone === 'residential' ? 'house' : zone === 'commercial' ? 'shop' : zone === 'downtown' ? 'tower' : 'works'
     return {
@@ -233,7 +233,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const def = CIVIC_DEFS[i]
     const t = at(s.x, s.y)
     t.owner = { kind: 'civic', civic: def.id, menu: def.menu, label: def.name }
-    t.building = { wall: '#ece8de', roof: CIVIC_ROOF[def.id] ?? '#888', roofStyle: 'spire', detail: 'civic', h: 20, foot: 0.9, windows: true, owned: true }
+    t.building = { wall: '#ece8de', roof: CIVIC_ROOF[def.id] ?? '#888', roofStyle: 'flat', detail: 'civic', h: 26, foot: 0.85, windows: true, owned: true }
     t.label = def.name
   })
 
@@ -244,7 +244,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     taken.add(`${lot.x},${lot.y}`)
     const t = at(lot.x, lot.y)
     t.owner = { kind: 'business', businessId: shop.id, label: shop.name }
-    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#caa', roofStyle: 'hip', detail: 'shop', h: 13, foot: 0.9, windows: true, owned: true }
+    t.building = { wall: '#efe7d6', roof: BIZ_ROOF[shop.glyph] ?? '#caa', roofStyle: 'gable', detail: 'shop', h: 16, foot: 0.9, windows: true, owned: true }
     t.label = shop.name
   })
 
@@ -254,7 +254,7 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
     const t = at(lot.x, lot.y)
     if (placed < rentals) {
       t.owner = { kind: 'rental', label: 'Rental property' }
-      t.building = makeBuilding(lot.x, lot.y, 'residential', true, 8 + density * 1.5 + ((hash(seed, lot.x, lot.y) * 5) | 0))
+      t.building = makeBuilding(lot.x, lot.y, 'residential', true, 13 + density * 1.5 + ((hash(seed, lot.x, lot.y) * 5) | 0))
       taken.add(`${lot.x},${lot.y}`)
       placed++
     } else {
@@ -267,9 +267,9 @@ export function makeWorld(seed: number, shops: Shop[], rentals: number, density:
   for (const lot of lots) {
     if (taken.has(`${lot.x},${lot.y}`)) continue
     const t = at(lot.x, lot.y)
-    const builtChance = lot.zone === 'industrial' ? 0.72 : lot.zone === 'downtown' ? 0.95 : 0.86
+    const builtChance = lot.zone === 'industrial' ? 0.82 : lot.zone === 'downtown' ? 0.96 : 0.92
     if (hash(seed ^ 0x31, lot.x, lot.y) > builtChance) {
-      t.tree = hash(seed ^ 0x41, lot.x, lot.y) > 0.45
+      t.tree = hash(seed ^ 0x41, lot.x, lot.y) > 0.6
       continue
     }
     t.building = makeBuilding(lot.x, lot.y, lot.zone, false)

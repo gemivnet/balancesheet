@@ -153,10 +153,34 @@
     ctx.lineWidth = 1
     ctx.stroke()
   }
-  function windows(face: Pt[]) {
-    const [a, b, c, d] = face
-    for (const f of [0.36, 0.7]) segLine(lerp(a, d, f), lerp(b, c, f), 'rgba(0,0,0,0.16)')
-    segLine(lerp(a, b, 0.5), lerp(d, c, 0.5), 'rgba(0,0,0,0.16)')
+  // bilinear point inside a wall face quad [ground-out, ground-in, top-in, top-out]
+  function bilerp(q: Pt[], u: number, v: number): Pt {
+    return lerp(lerp(q[0], q[1], u), lerp(q[3], q[2], u), v)
+  }
+  function panel(q: Pt[], u0: number, v0: number, u1: number, v1: number, fill: string) {
+    poly([bilerp(q, u0, v0), bilerp(q, u1, v0), bilerp(q, u1, v1), bilerp(q, u0, v1)], fill, 'rgba(0,0,0,0.12)')
+  }
+  function foundation(q: Pt[]) {
+    panel(q, 0, 0, 1, 0.12, '#9a958c')
+  }
+  function door(q: Pt[]) {
+    panel(q, 0.42, 0, 0.58, 0.42, '#4a3b2e')
+  }
+  function windowGrid(q: Pt[], cols: number, floors: number, key: number, side: number) {
+    const padU = 0.16
+    const padV = 0.14
+    const cw = (1 - padU * 2) / cols
+    const fh = (1 - padV * 2) / floors
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < floors; r++) {
+        const u0 = padU + c * cw + cw * 0.2
+        const u1 = padU + (c + 1) * cw - cw * 0.2
+        const v0 = padV + r * fh + fh * 0.2
+        const v1 = padV + (r + 1) * fh - fh * 0.2
+        const lit = (key + c * 101 + r * 53 + side * 131) % 5 === 0
+        panel(q, u0, v0, u1, v1, lit ? '#ffd27a' : '#41546b')
+      }
+    }
   }
   function chimney(px: number, py: number, h: number, f: number) {
     if (!ctx) return
@@ -200,38 +224,57 @@
     const b = t.building!
     const h = b.h * zoom
     if (b.roofStyle === 'flat') return py - h
-    const rh = (b.roofStyle === 'spire' ? thz * 1.3 : thz * 0.5) + 4
-    return py - h - (thz / 2) * b.foot - rh
+    const eaveF = Math.min(1, b.foot * 1.06)
+    return py - h - (thz / 2) * eaveF - (thz * 0.34 + 2)
   }
   function drawBuilding(px: number, py: number, t: WorldTile) {
     if (!ctx || !t.building) return
     const b = t.building
     const h = b.h * zoom
     const f = b.foot
-    poly(leftFace(px, py, h, f), darken(b.wall, 0.8), E)
-    poly(rightFace(px, py, h, f), darken(b.wall, 0.62), E)
-    if (zoom > 0.7 && h > 12) {
-      windows(leftFace(px, py, h, f))
-      windows(rightFace(px, py, h, f))
+    const lf = leftFace(px, py, h, f)
+    const rf = rightFace(px, py, h, f)
+    poly(lf, darken(b.wall, 0.8), E)
+    poly(rf, darken(b.wall, 0.62), E)
+    if (zoom > 0.85) {
+      foundation(lf)
+      foundation(rf)
+      const floors = Math.max(1, Math.min(7, Math.round(b.h / 4)))
+      const cols = b.detail === 'tower' ? 3 : 2
+      const key = ((t.x * 73856093) ^ (t.y * 19349663)) >>> 0
+      windowGrid(lf, cols, floors, key, 0)
+      windowGrid(rf, cols, floors, key, 1)
+      if (b.detail === 'house' || b.detail === 'civic') door(rf)
     }
-    const top = diamond(px, py, h, f)
     if (b.roofStyle === 'flat') {
-      poly(top, b.roof, E)
-      if (b.chimney) chimney(px, py, h, f)
-    } else {
-      poly(top, darken(b.wall, 0.9), E)
-      const rh = (b.roofStyle === 'spire' ? thz * 1.3 : thz * 0.5) + 4
-      const apex: Pt = [px, py - h - (thz / 2) * f - rh]
-      poly([top[3], top[2], apex], darken(b.roof, 0.82), E)
-      poly([top[2], top[1], apex], b.roof, E)
-    }
-    if (zoom > 0.7) {
-      if (b.detail === 'tower') miniBox(px, py, h, 5 * zoom, f * 0.4, '#717f93')
-      else if (b.detail === 'shop') {
-        const rf = rightFace(px, py, h, f)
-        poly([rf[0], rf[1], lerp(rf[1], rf[2], 0.22), lerp(rf[0], rf[3], 0.22)], '#c0392b', E)
+      poly(diamond(px, py, h, f), b.roof, E)
+      if (b.detail === 'tower') {
+        miniBox(px, py, h, h * 0.32, f * 0.66, b.wall)
+        miniBox(px, py, h + h * 0.32, 5 * zoom, f * 0.3, '#717f93')
+      } else if (b.chimney) {
+        chimney(px, py, h, f)
+        if (zoom > 0.8) smoke(px + twz * 0.18 * f, py - h - 9 * zoom)
       }
-      if (b.chimney) smoke(px + (twz * 0.18) * f, py - h - 9 * zoom)
+    } else {
+      // gable roof: a ridge running front-to-back with two visible slopes
+      const eaveF = Math.min(1, f * 1.06)
+      const hh = (thz / 2) * eaveF
+      const hw = (twz / 2) * eaveF
+      const cyT = py - h
+      const T: Pt = [px, cyT - hh]
+      const R: Pt = [px + hw, cyT]
+      const B: Pt = [px, cyT + hh]
+      const L: Pt = [px - hw, cyT]
+      const rh = thz * 0.34 + 2
+      const rT: Pt = [px, cyT - hh - rh]
+      const rB: Pt = [px, cyT + hh - rh]
+      poly(diamond(px, py, h, f), darken(b.wall, 0.9), E)
+      poly([T, L, B, rB, rT], darken(b.roof, 0.72), E)
+      poly([T, R, B, rB, rT], b.roof, E)
+      segLine(rT, rB, darken(b.roof, 0.55))
+    }
+    if (b.detail === 'shop' && zoom > 0.7) {
+      poly([rf[0], rf[1], lerp(rf[1], rf[2], 0.22), lerp(rf[0], rf[3], 0.22)], '#c0392b', E)
     }
     if (b.owned && zoom > 0.7) drawFlag(px, buildingTopY(t, py))
   }
