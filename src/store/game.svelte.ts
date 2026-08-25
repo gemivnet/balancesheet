@@ -692,13 +692,23 @@ export function downloadSave(): void {
 }
 
 export function importSave(raw: string): boolean {
+  // Order matters. This used to save() straight after constructing the engine, before
+  // snapshot() had proven the state could actually render -- and snapshot() is exactly
+  // where a malformed save throws. So importing a truncated or hand-edited file
+  // overwrote the player's real save on the way to reporting failure, leaving a frozen
+  // game and no way back. Export/import is the only backup this game has.
+  const previousEngine = engine
+  const previousCitySig = lastCitySig
   try {
     engine = new Engine(deserialize(raw))
-    save(engine.state)
     lastCitySig = ''
-    snapshot()
+    snapshot() // proves it renders; throws here on a bad save, before anything persists
+    save(engine.state)
     return true
   } catch {
+    engine = previousEngine
+    lastCitySig = previousCitySig
+    snapshot() // put the UI back on the save the player still has
     return false
   }
 }
