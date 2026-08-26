@@ -1,0 +1,35 @@
+# Runs the checks that already exist locally. Until this file, 7 test files and a
+# clean svelte-check ran only when someone remembered to type the command.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      # ci, not install: fails on a lockfile that has drifted from package.json
+      # rather than quietly resolving something different from local.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Test
+        run: npm test
+
+      # The build is what actually ships, so a build that no longer completes should
+      # fail here rather than at deploy time.
+      - name: Build
+        run: npm run build
